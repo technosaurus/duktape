@@ -549,6 +549,7 @@ static void duk__debuglog_qsort_state(duk_context *ctx, duk_int_t lo, duk_int_t 
 	if (n > 4000) {
 		n = 4000;
 	}
+	/* FIXME: EBCDIC */
 	*ptr++ = '[';
 	for (i = 0; i < n; i++) {
 		if (i == pivot) {

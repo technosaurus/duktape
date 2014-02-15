@@ -494,8 +494,8 @@ static duk_bool_t duk__format_parts_strftime(duk_context *ctx, duk_int_t *parts,
 
 /* Matching separator index is used in the control table */
 static const duk_uint8_t duk__parse_iso8601_seps[] = {
-	DUK_ASC_PLUS /*0*/, DUK_ASC_MINUS /*1*/, DUK_ASC_UC_T /*2*/, DUK_ASC_SPACE /*3*/,
-	DUK_ASC_COLON /*4*/, DUK_ASC_PERIOD /*5*/, DUK_ASC_UC_Z /*6*/, DUK_ASC_NUL /*7*/
+	DUK_ASC_PLUS  /*0*/, DUK_ASC_MINUS  /*1*/, DUK_ASC_UC_T /*2*/, DUK_ASC_SPACE /*3*/,
+	DUK_ASC_COLON /*4*/, DUK_ASC_PERIOD /*5*/, DUK_ASC_UC_Z /*6*/, DUK_ASC_NUL   /*7*/
 };
 
 /* Rule table: first matching rule is used to determine what to do next. */
