@@ -860,8 +860,9 @@ void duk_remove(duk_context *ctx, duk_idx_t index) {
  *  Stack slice primitives
  */
 
-void duk_xmove(duk_context *ctx, duk_context *from_ctx, duk_idx_t count) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+void duk_xmove(duk_context *to_ctx, duk_context *from_ctx, duk_idx_t count) {
+	duk_context *ctx = to_ctx;
+	duk_hthread *thr = (duk_hthread *) to_ctx;
 	duk_hthread *from_thr = (duk_hthread *) from_ctx;
 	void *src;
 	duk_size_t nbytes;
@@ -869,6 +870,7 @@ void duk_xmove(duk_context *ctx, duk_context *from_ctx, duk_idx_t count) {
 
 	DUK_ASSERT(ctx != NULL);
 	DUK_ASSERT(from_ctx != NULL);
+	DUK_UNREF(ctx);
 
 	if (count < 0) {
 		DUK_ERROR(thr, DUK_ERR_API_ERROR, DUK_STR_INVALID_COUNT);
@@ -880,6 +882,7 @@ void duk_xmove(duk_context *ctx, duk_context *from_ctx, duk_idx_t count) {
 		return;
 	}
 	DUK_ASSERT(thr->valstack_top <= thr->valstack_end);
+
 	if ((duk_size_t) ((duk_uint8_t *) thr->valstack_end - (duk_uint8_t *) thr->valstack_top) < nbytes) {
 		DUK_ERROR(thr, DUK_ERR_API_ERROR, DUK_STR_PUSH_BEYOND_ALLOC_STACK);
 	}
@@ -899,6 +902,9 @@ void duk_xmove(duk_context *ctx, duk_context *from_ctx, duk_idx_t count) {
 		DUK_TVAL_INCREF(thr, p);  /* no side effects */
 		p++;
 	}
+
+	/* remove values from the source stack */
+	duk_set_top(from_ctx, -count);
 }
 
 /*
