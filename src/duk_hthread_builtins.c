@@ -546,6 +546,28 @@ void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 #endif  /* DUK_USE_USER_INITJS */
 
 	/*
+	 *  Thread init callback which user can register to the heap stash object.
+	 *  This provides much more flexibility in initializing a thread.
+	 */
+
+#ifdef DUK_USE_GLOBAL_INIT_CALLBACK
+	if (thr->heap->heap_object != NULL) {
+		/* XXX: heap_object is not set when creating the initial thread. */
+		duk_push_heap_stash(ctx);
+		if (duk_get_prop_stridx(ctx, -1, DUK_STRIDX_GLOB_INIT)) {
+			int globinit_rc = duk_pcall(ctx, 0 /*nargs*/);  /* [ ... globInit ] -> [ ... result ] */
+			DUK_UNREF(globinit_rc);
+			if (globinit_rc != DUK_EXEC_SUCCESS) {
+				DUK_DPRINT("user globInit() callback failed: %!T", duk_get_tval(ctx, -1));
+			} else {
+				DUK_DDPRINT("user globInit() ok, result: %!T", duk_get_tval(ctx, -1));
+			}
+		}
+		duk_pop_2(ctx);
+	}
+#endif  /* DUK_USE_GLOBAL_INIT_CALLBACK */
+
+	/*
 	 *  Since built-ins are not often extended, compact them.
 	 */
 
@@ -586,4 +608,3 @@ void duk_hthread_copy_builtin_objects(duk_hthread *thr_from, duk_hthread *thr_to
 		DUK_HOBJECT_INCREF(thr_to, thr_to->builtins[i]);  /* side effect free */
 	}
 }
-

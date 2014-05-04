@@ -1983,7 +1983,7 @@ typedef FILE duk_file;
 #endif
 
 /*
- *  InitJS code
+ *  InitJS code and global environment init callback
  */
 
 /* Always use the built-in InitJS code for now. */
@@ -1994,6 +1994,11 @@ typedef FILE duk_file;
 #if defined(DUK_OPT_USER_INITJS)
 #define DUK_USE_USER_INITJS (DUK_OPT_USER_INITJS)
 #endif
+
+/* User provided (heapStash).globInit callback for more extensive
+ * interaction with global environment creation.
+ */
+#define DUK_USE_GLOBAL_INIT_CALLBACK
 
 /*
  *  Miscellaneous

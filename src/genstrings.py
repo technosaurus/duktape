@@ -627,10 +627,13 @@ duk_string_list = [
 	# Auxiliary logger strings
 	mkstr("clog", custom=True),  # C logger
 
-	# for controlling log formatting of objects
+	# For controlling log formatting of objects
 	mkstr("toLogString", custom=True),
 
-	# special literals for custom json encodings
+	# Heap stash
+	mkstr("globInit", custom=True),
+
+	# Special literals for custom json encodings
 	mkstr('{"_undef":true}', custom=True),
 	mkstr('{"_nan":true}', custom=True),
 	mkstr('{"_inf":true}', custom=True),
