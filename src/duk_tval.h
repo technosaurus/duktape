@@ -52,6 +52,7 @@ typedef union duk_double_union duk_tval;
 #define DUK_TAG_STRING            0xfff5UL   /* embed: duk_hstring ptr */
 #define DUK_TAG_OBJECT            0xfff6UL   /* embed: duk_hobject ptr */
 #define DUK_TAG_BUFFER            0xfff7UL   /* embed: duk_hbuffer ptr */
+#define DUK_TAG_FASTINT           0xfff8UL   /* embed: integer value */
 
 /* for convenience */
 #define DUK_XTAG_UNDEFINED_ACTUAL 0xfff10000UL
@@ -187,6 +188,7 @@ struct duk_tval_struct {
 #define DUK_TAG_STRING                5
 #define DUK_TAG_OBJECT                6
 #define DUK_TAG_BUFFER                7
+#define DUK_TAG_FASTINT               8
 
 /* DUK__TAG_NUMBER is intentionally first, as it is the default clause in code
  * to support the 8-byte representation.  Further, it is a non-heap-allocated
