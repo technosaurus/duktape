@@ -166,8 +166,7 @@ typedef struct duk_tval_struct duk_tval;
 struct duk_tval_struct {
 	int t;
 	union {
-		double d;
-		int i;
+		duk_int64_t i;
 		void *voidptr;
 		duk_hstring *hstring;
 		duk_hobject *hobject;
@@ -216,7 +215,7 @@ struct duk_tval_struct {
 
 #define DUK_TVAL_SET_NUMBER(tv,val)  do { \
 		(tv)->t = DUK__TAG_NUMBER; \
-		(tv)->v.d = (val); \
+		(tv)->v.i = (duk_int64_t) (val * 128.0); \
 	} while (0)
 
 #define DUK_TVAL_SET_STRING(tv,hptr)  do { \
@@ -249,7 +248,7 @@ struct duk_tval_struct {
 
 /* getters */
 #define DUK_TVAL_GET_BOOLEAN(tv)           ((tv)->v.i)
-#define DUK_TVAL_GET_NUMBER(tv)            ((tv)->v.d)
+#define DUK_TVAL_GET_NUMBER(tv)            ((double) (tv)->v.i / 128.0)
 #define DUK_TVAL_GET_STRING(tv)            ((tv)->v.hstring)
 #define DUK_TVAL_GET_OBJECT(tv)            ((tv)->v.hobject)
 #define DUK_TVAL_GET_BUFFER(tv)            ((tv)->v.hbuffer)
