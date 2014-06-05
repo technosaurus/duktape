@@ -117,6 +117,7 @@ DUKTAPE_SOURCES_SEPARATE =	\
 	$(DISTSRCSEP)/duk_api_debug.c \
 	$(DISTSRCSEP)/duk_api.c \
 	$(DISTSRCSEP)/duk_lexer.c \
+	$(DISTSRCSEP)/duk_tval.c \
 	$(DISTSRCSEP)/duk_js_call.c \
 	$(DISTSRCSEP)/duk_js_executor.c \
 	$(DISTSRCSEP)/duk_js_compiler.c \
@@ -162,7 +163,7 @@ CCOPTS_SHARED += -Wall
 CCOPTS_SHARED += -Wextra  # very picky but catches e.g. signed/unsigned comparisons
 CCOPTS_SHARED += -I./dist/src
 #CCOPTS_SHARED += -I./dist/src-separate
-#CCOPTS_SHARED += -m32                             # force 32-bit compilation on a 64-bit host
+CCOPTS_SHARED += -m32                             # force 32-bit compilation on a 64-bit host
 #CCOPTS_SHARED += -mx32                            # force X32 compilation on a 64-bit host
 #CCOPTS_SHARED += -DDUK_OPT_NO_PACKED_TVAL
 #CCOPTS_SHARED += -DDUK_OPT_FORCE_ALIGN=4
@@ -204,7 +205,7 @@ CCOPTS_SHARED += -DDUK_OPT_DEBUG_BUFSIZE=512
 #CCOPTS_SHARED += -DDUK_OPT_NO_ES6_PROXY
 #CCOPTS_SHARED += -DDUK_OPT_NO_ZERO_BUFFER_DATA
 #CCOPTS_SHARED += -DDUK_OPT_USER_INITJS='"this.foo = 123"'
-#CCOPTS_SHARED += -DDUK_CMDLINE_BAREBONES
+CCOPTS_SHARED += -DDUK_CMDLINE_BAREBONES
 CCOPTS_NONDEBUG = $(CCOPTS_SHARED) -Os -fomit-frame-pointer
 CCOPTS_NONDEBUG += -g -ggdb
 #CCOPTS_NONDEBUG += -DDUK_OPT_ASSERTIONS
@@ -215,8 +216,8 @@ CCOPTS_DEBUG += -DDUK_OPT_DPRINT
 #CCOPTS_DEBUG += -DDUK_OPT_DDDPRINT
 CCOPTS_DEBUG += -DDUK_OPT_ASSERTIONS
 CCLIBS	= -lm
-CCLIBS += -lreadline
-CCLIBS += -lncurses  # on some systems -lreadline also requires -lncurses (e.g. RHEL)
+#CCLIBS += -lreadline
+#CCLIBS += -lncurses  # on some systems -lreadline also requires -lncurses (e.g. RHEL)
 
 # Replace 'duk' and 'dukd' with automatic valgrind wrappers (plain commands
 # will be duk.raw and dukd.raw).  Targets for runtests.js bypass the wrapper

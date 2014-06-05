@@ -101,6 +101,37 @@ static void duk__vm_arith_add(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y, 
 	 *  Fast paths
 	 */
 
+	if (DUK_TVAL_IS_NUMBER_FASTINT(tv_x) && DUK_TVAL_IS_NUMBER_FASTINT(tv_y)) {
+		duk_int64_t v1, v2, v3;
+		duk_int32_t v3_hi;
+		duk_tval tv_tmp;
+		duk_tval *tv_z;
+
+		/* Input values are signed 48-bit so we can detect overflow
+		 * reliably from high bits or just a comparison.
+		 */
+
+		v1 = DUK_TVAL_GET_NUMBER_FASTINT(tv_x);
+		v2 = DUK_TVAL_GET_NUMBER_FASTINT(tv_y);
+		v3 = v1 + v2;
+		v3_hi = (duk_int32_t) (v3 >> 32);
+		if (DUK_UNLIKELY(v3_hi < -0x8000 || v3_hi > 0x7fff)) {
+			fprintf(stderr, "fastint overflow: %lld + %lld -> %lld\n", v1, v2, v3);
+			goto fastint_overflow;
+		}
+#if 0
+		fprintf(stderr, "fastint add: %lld + %lld -> %lld\n", v1, v2, v3);
+#endif
+
+		tv_z = &thr->valstack_bottom[idx_z];
+		DUK_TVAL_SET_TVAL(&tv_tmp, tv_z);
+		DUK_TVAL_SET_NUMBER_FASTINT(tv_z, v3);
+		DUK_ASSERT(!DUK_TVAL_IS_HEAP_ALLOCATED(tv_z));  /* no need to incref */
+		DUK_TVAL_DECREF(thr, &tv_tmp);   /* side effects */
+		return;
+	}
+ fastint_overflow:
+
 	if (DUK_TVAL_IS_NUMBER(tv_x) && DUK_TVAL_IS_NUMBER(tv_y)) {
 		duk_tval tv_tmp;
 		duk_tval *tv_z;
@@ -1735,12 +1766,12 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 			duk_int_fast_t bc;
 			duk_tval tv_tmp;
 			duk_tval *tv1;
-			duk_double_t val;
+			duk_int64_t val;
 
 			a = DUK_DEC_A(ins); tv1 = DUK__REGP(a);
-			bc = DUK_DEC_BC(ins); val = (duk_double_t) (bc - DUK_BC_LDINT_BIAS);
+			bc = DUK_DEC_BC(ins); val = (duk_int64_t) (bc - DUK_BC_LDINT_BIAS);
 			DUK_TVAL_SET_TVAL(&tv_tmp, tv1);
-			DUK_TVAL_SET_NUMBER(tv1, val);
+			DUK_TVAL_SET_NUMBER_FASTINT(tv1, val);
 			DUK_TVAL_DECREF(thr, &tv_tmp);  /* side effects */
 			break;
 		}

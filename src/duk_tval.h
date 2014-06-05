@@ -48,11 +48,11 @@ typedef union duk_double_union duk_tval;
 #define DUK_TAG_NULL              0xfff2UL   /* embed: nothing */
 #define DUK_TAG_BOOLEAN           0xfff3UL   /* embed: 0 or 1 (false or true) */
 /* DUK_TAG_NUMBER would logically go here, but it has multiple 'tags' */
-#define DUK_TAG_POINTER           0xfff4UL   /* embed: void ptr */
-#define DUK_TAG_STRING            0xfff5UL   /* embed: duk_hstring ptr */
-#define DUK_TAG_OBJECT            0xfff6UL   /* embed: duk_hobject ptr */
-#define DUK_TAG_BUFFER            0xfff7UL   /* embed: duk_hbuffer ptr */
-#define DUK_TAG_FASTINT           0xfff8UL   /* embed: integer value */
+#define DUK_TAG_FASTINT           0xfff4UL   /* embed: integer value */
+#define DUK_TAG_POINTER           0xfff5UL   /* embed: void ptr */
+#define DUK_TAG_STRING            0xfff6UL   /* embed: duk_hstring ptr */
+#define DUK_TAG_OBJECT            0xfff7UL   /* embed: duk_hobject ptr */
+#define DUK_TAG_BUFFER            0xfff8UL   /* embed: duk_hbuffer ptr */
 
 /* for convenience */
 #define DUK_XTAG_UNDEFINED_ACTUAL 0xfff10000UL
@@ -99,8 +99,14 @@ typedef union duk_double_union duk_tval;
 	} while (0)
 #endif  /* DUK_USE_64BIT_OPS */
 
+/* FIXME: 64-bit required */
+#define DUK__TVAL_SET_FASTINT(v,i)  do { \
+		(v)->ull[DUK_DBL_IDX_ULL0] = (((duk_uint64_t) DUK_TAG_FASTINT) << 48) | ((duk_uint64_t) (i) & 0x0000ffffffffffffULL); \
+	} while (0)
+
 /* select actual setters */
 #ifdef DUK_USE_FULL_TVAL
+#error not here
 #define DUK_TVAL_SET_UNDEFINED_ACTUAL(v)    DUK__TVAL_SET_UNDEFINED_ACTUAL_FULL((v))
 #define DUK_TVAL_SET_UNDEFINED_UNUSED(v)    DUK__TVAL_SET_UNDEFINED_UNUSED_FULL((v))
 #define DUK_TVAL_SET_NULL(v)                DUK__TVAL_SET_NULL_FULL((v))
@@ -112,7 +118,9 @@ typedef union duk_double_union duk_tval;
 #define DUK_TVAL_SET_UNDEFINED_UNUSED(v)    DUK__TVAL_SET_UNDEFINED_UNUSED_NOTFULL((v))
 #define DUK_TVAL_SET_NULL(v)                DUK__TVAL_SET_NULL_NOTFULL((v))
 #define DUK_TVAL_SET_BOOLEAN(v,i)           DUK__TVAL_SET_BOOLEAN_NOTFULL((v),(i))
-#define DUK_TVAL_SET_NUMBER(v,d)            DUK__TVAL_SET_NUMBER_NOTFULL((v),(d))
+#define DUK_TVAL_SET_NUMBER_DOUBLE(v,d)     DUK__TVAL_SET_NUMBER_NOTFULL((v),(d))
+#define DUK_TVAL_SET_NUMBER_FASTINT(v,i)    DUK__TVAL_SET_FASTINT((v),(i))
+#define DUK_TVAL_SET_NUMBER(v,d)            duk_tval_set_number_double((v),(d))
 #define DUK_TVAL_SET_NAN(v)                 DUK__TVAL_SET_NAN_NOTFULL((v))
 #endif
 
@@ -125,7 +133,11 @@ typedef union duk_double_union duk_tval;
 
 /* getters */
 #define DUK_TVAL_GET_BOOLEAN(v)             ((int) (v)->us[DUK_DBL_IDX_US1])
-#define DUK_TVAL_GET_NUMBER(v)              ((v)->d)
+#define DUK_TVAL_GET_NUMBER_DOUBLE(v)       ((v)->d)
+#define DUK_TVAL_GET_NUMBER_FASTINT(v)      (((((duk_int64_t) (v)->ull[DUK_DBL_IDX_ULL0]) & 0x0000ffffffffffffLL) << 16) >> 16)  /* XXX: sign extend */
+#define DUK_TVAL_GET_NUMBER(v)              (DUK_TVAL_IS_NUMBER_FASTINT(v) ? \
+                                                DUK_TVAL_GET_NUMBER_FASTINT(v) : \
+                                                DUK_TVAL_GET_NUMBER_DOUBLE(v))
 #define DUK_TVAL_GET_STRING(v)              ((duk_hstring *) (v)->vp[DUK_DBL_IDX_VP1])
 #define DUK_TVAL_GET_OBJECT(v)              ((duk_hobject *) (v)->vp[DUK_DBL_IDX_VP1])
 #define DUK_TVAL_GET_BUFFER(v)              ((duk_hbuffer *) (v)->vp[DUK_DBL_IDX_VP1])
@@ -147,9 +159,13 @@ typedef union duk_double_union duk_tval;
 #define DUK_TVAL_IS_BUFFER(v)               (DUK_TVAL_GET_TAG((v)) == DUK_TAG_BUFFER)
 #define DUK_TVAL_IS_POINTER(v)              (DUK_TVAL_GET_TAG((v)) == DUK_TAG_POINTER)
 /* 0xfff0 is -Infinity */
-#define DUK_TVAL_IS_NUMBER(v)               (DUK_TVAL_GET_TAG((v)) <= 0xfff0UL)
+#define DUK_TVAL_IS_NUMBER_DOUBLE(v)        (DUK_TVAL_GET_TAG((v)) <= 0xfff0UL)
+#define DUK_TVAL_IS_NUMBER_FASTINT(v)       (DUK_TVAL_GET_TAG((v)) == DUK_TAG_FASTINT)
+#define DUK_TVAL_IS_NUMBER(v)               (DUK_TVAL_IS_NUMBER_DOUBLE((v)) || DUK_TVAL_IS_NUMBER_FASTINT((v)))
 
 #define DUK_TVAL_IS_HEAP_ALLOCATED(v)       (DUK_TVAL_GET_TAG((v)) >= DUK_TAG_STRING)
+
+void duk_tval_set_number_double(duk_tval *tv, duk_double_t x);
 
 #else  /* DUK_USE_PACKED_TVAL */
 /* ======================================================================== */
