@@ -44,22 +44,22 @@ typedef union duk_double_union duk_tval;
 /* tags */
 #define DUK_TAG_NORMALIZED_NAN    0x7ff8UL   /* the NaN variant we use */
 /* avoid tag 0xfff0, no risk of confusion with negative infinity */
-#define DUK_TAG_UNDEFINED         0xfff1UL   /* embed: 0 or 1 (normal or unused) */
-#define DUK_TAG_NULL              0xfff2UL   /* embed: nothing */
-#define DUK_TAG_BOOLEAN           0xfff3UL   /* embed: 0 or 1 (false or true) */
+#define DUK_TAG_FASTINT           0xfff1UL   /* embed: integer value */
+#define DUK_TAG_UNDEFINED         0xfff2UL   /* embed: 0 or 1 (normal or unused) */
+#define DUK_TAG_NULL              0xfff3UL   /* embed: nothing */
+#define DUK_TAG_BOOLEAN           0xfff4UL   /* embed: 0 or 1 (false or true) */
 /* DUK_TAG_NUMBER would logically go here, but it has multiple 'tags' */
-#define DUK_TAG_FASTINT           0xfff4UL   /* embed: integer value */
 #define DUK_TAG_POINTER           0xfff5UL   /* embed: void ptr */
 #define DUK_TAG_STRING            0xfff6UL   /* embed: duk_hstring ptr */
 #define DUK_TAG_OBJECT            0xfff7UL   /* embed: duk_hobject ptr */
 #define DUK_TAG_BUFFER            0xfff8UL   /* embed: duk_hbuffer ptr */
 
 /* for convenience */
-#define DUK_XTAG_UNDEFINED_ACTUAL 0xfff10000UL
-#define DUK_XTAG_UNDEFINED_UNUSED 0xfff10001UL
-#define DUK_XTAG_NULL             0xfff20000UL
-#define DUK_XTAG_BOOLEAN_FALSE    0xfff30000UL
-#define DUK_XTAG_BOOLEAN_TRUE     0xfff30001UL
+#define DUK_XTAG_UNDEFINED_ACTUAL 0xfff20000UL
+#define DUK_XTAG_UNDEFINED_UNUSED 0xfff20001UL
+#define DUK_XTAG_NULL             0xfff30000UL
+#define DUK_XTAG_BOOLEAN_FALSE    0xfff40000UL
+#define DUK_XTAG_BOOLEAN_TRUE     0xfff40001UL
 
 #define DUK__TVAL_SET_UNDEFINED_ACTUAL_FULL(v)      DUK_DBLUNION_SET_HIGH32_ZERO_LOW32((v), DUK_XTAG_UNDEFINED_ACTUAL)
 #define DUK__TVAL_SET_UNDEFINED_ACTUAL_NOTFULL(v)   DUK_DBLUNION_SET_HIGH32((v), DUK_XTAG_UNDEFINED_ACTUAL)
@@ -161,7 +161,7 @@ typedef union duk_double_union duk_tval;
 /* 0xfff0 is -Infinity */
 #define DUK_TVAL_IS_NUMBER_DOUBLE(v)        (DUK_TVAL_GET_TAG((v)) <= 0xfff0UL)
 #define DUK_TVAL_IS_NUMBER_FASTINT(v)       (DUK_TVAL_GET_TAG((v)) == DUK_TAG_FASTINT)
-#define DUK_TVAL_IS_NUMBER(v)               (DUK_TVAL_IS_NUMBER_DOUBLE((v)) || DUK_TVAL_IS_NUMBER_FASTINT((v)))
+#define DUK_TVAL_IS_NUMBER(v)               (DUK_TVAL_GET_TAG((v)) <= 0xfff1UL)
 
 #define DUK_TVAL_IS_HEAP_ALLOCATED(v)       (DUK_TVAL_GET_TAG((v)) >= DUK_TAG_STRING)
 
