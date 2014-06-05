@@ -1387,6 +1387,7 @@ duk_size_t duk_get_length(duk_context *ctx, duk_idx_t index) {
 		DUK_ASSERT(h != NULL);
 		return (duk_size_t) DUK_HBUFFER_GET_SIZE(h);
 	}
+	case DUK_TAG_FASTINT:
 	default:
 		/* number */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
@@ -1828,6 +1829,7 @@ const char *duk_to_string(duk_context *ctx, duk_idx_t index) {
 		}
 		break;
 	}
+	case DUK_TAG_FASTINT:
 	default: {
 		/* number */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
@@ -1947,6 +1949,7 @@ void *duk_to_pointer(duk_context *ctx, duk_idx_t index) {
 		 */
 		res = (void *) DUK_TVAL_GET_HEAPHDR(tv);
 		break;
+	case DUK_TAG_FASTINT:
 	default:
 		/* number */
 		res = NULL;
@@ -2007,6 +2010,7 @@ void duk_to_object(duk_context *ctx, duk_idx_t index) {
 		shared_proto = DUK_BIDX_POINTER_PROTOTYPE;
 		goto create_object;
 	}
+	case DUK_TAG_FASTINT:
 	default: {
 		shared_flags = DUK_HOBJECT_FLAG_EXTENSIBLE |
 		               DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_NUMBER);
@@ -2080,6 +2084,7 @@ duk_int_t duk_get_type(duk_context *ctx, duk_idx_t index) {
 		return DUK_TYPE_BUFFER;
 	case DUK_TAG_POINTER:
 		return DUK_TYPE_POINTER;
+	case DUK_TAG_FASTINT:
 	default:
 		/* Note: number has no explicit tag (in 8-byte representation) */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
@@ -2114,6 +2119,7 @@ duk_uint_t duk_get_type_mask(duk_context *ctx, duk_idx_t index) {
 		return DUK_TYPE_MASK_BUFFER;
 	case DUK_TAG_POINTER:
 		return DUK_TYPE_MASK_POINTER;
+	case DUK_TAG_FASTINT:
 	default:
 		/* Note: number has no explicit tag (in 8-byte representation) */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));

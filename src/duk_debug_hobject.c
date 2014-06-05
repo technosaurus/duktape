@@ -93,6 +93,7 @@ static char duk__get_tval_summary_char(duk_tval *tv) {
 	case DUK_TAG_POINTER: {
 		return 'P';
 	}
+	case DUK_TAG_FASTINT:
 	default:
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
 		return 'd';

@@ -1573,6 +1573,7 @@ static void duk__enc_value2(duk_json_enc_ctx *js_ctx) {
 		break;
 	}
 #endif  /* DUK_USE_JX || DUK_USE_JC */
+	case DUK_TAG_FASTINT:
 	default: {
 		/* number */
 		duk_double_t d;

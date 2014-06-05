@@ -87,6 +87,7 @@ duk_bool_t duk_js_toboolean(duk_tval *tv) {
 		void *p = DUK_TVAL_GET_POINTER(tv);
 		return (p != NULL ? 1 : 0);
 	}
+	case DUK_TAG_FASTINT:
 	default: {
 		/* number */
 		int c;
@@ -220,6 +221,7 @@ duk_double_t duk_js_tonumber(duk_hthread *thr, duk_tval *tv) {
 		void *p = DUK_TVAL_GET_POINTER(tv);
 		return (p != NULL ? 1.0 : 0.0);
 	}
+	case DUK_TAG_FASTINT:
 	default: {
 		/* number */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
@@ -522,6 +524,7 @@ duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y
 	 */
 
 	if (DUK_TVAL_IS_NUMBER(tv_x) && DUK_TVAL_IS_NUMBER(tv_y)) {
+		/* Catches both double and fastint cases */
 		if (DUK_UNLIKELY((flags & DUK_EQUALS_FLAG_SAMEVALUE) != 0)) {
 			/* SameValue */
 			return duk__js_samevalue_number(DUK_TVAL_GET_NUMBER(tv_x),
@@ -574,6 +577,7 @@ duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y
 				return (DUK_MEMCMP(buf_x, buf_y, len_x) == 0) ? 1 : 0;
 			}
 		}
+		case DUK_TAG_FASTINT:
 		default: {
 			DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv_x));
 			DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv_y));
@@ -1119,6 +1123,7 @@ duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
 		stridx = DUK_STRIDX_LC_BUFFER;
 		break;
 	}
+	case DUK_TAG_FASTINT:
 	default: {
 		/* number */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv_x));
