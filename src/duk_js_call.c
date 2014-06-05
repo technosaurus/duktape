@@ -908,6 +908,8 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	 *  See E5 Section 15.3.4.5.1.
 	 */
 
+	/* FIXME: lightweight function support here */
+
 	if (!duk_is_callable(thr, idx_func)) {
 		DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, DUK_STR_NOT_CALLABLE);
 	}
