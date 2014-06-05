@@ -1573,6 +1573,10 @@ static void duk__enc_value2(duk_json_enc_ctx *js_ctx) {
 		break;
 	}
 #endif  /* DUK_USE_JX || DUK_USE_JC */
+	case DUK_TAG_LIGHTFUNC: {
+		DUK_ERROR(js_ctx->thr, DUK_ERR_TYPE_ERROR, "FIXME: lightfunc json unimplemented");
+		break;
+	}
 	default: {
 		/* number */
 		duk_double_t d;
