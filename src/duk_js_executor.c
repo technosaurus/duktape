@@ -2664,6 +2664,29 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 #endif
 
 			tv_func = DUK__REGP(idx);
+
+			/* FIXME: lightfunc hack, actual implementation needs a refactoring */
+			if (DUK_TVAL_IS_LIGHTFUNC(tv_func)) {
+				duk_set_top(ctx, b + c + 2);   /* [ ... func this arg1 ... argN ] */
+
+				call_flags = 0;  /* not protected, respect reclimit, not constructor */
+
+				/* FIXME: eval needs special handling if it can also be a lightfunc */
+
+				duk_handle_call(thr,
+				                c,            /* num_stack_args */
+				                call_flags);  /* call_flags */
+
+				/* FIXME: who should restore? */
+				duk_require_stack_top(ctx, fun->nregs);  /* may have shrunk by inner calls, must recheck */
+				duk_set_top(ctx, fun->nregs);
+
+				/* No need to reinit setjmp() catchpoint, as call handling
+				 * will store and restore our state.
+				 */
+				break;
+			}
+
 			if (!DUK_TVAL_IS_OBJECT(tv_func)) {
 				DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, "call target not an object");
 			}
