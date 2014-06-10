@@ -436,6 +436,10 @@ duk_int_t duk_get_magic(duk_context *ctx) {
 	act = duk_hthread_get_current_activation(thr);
 	if (act) {
 		func = act->func;
+		if (!func) {
+			/* FIXME: here we need to get lightfunc's magic value */
+			return 0;
+		}
 		DUK_ASSERT(func != NULL);
 
 		if (DUK_HOBJECT_IS_NATIVEFUNCTION(func)) {

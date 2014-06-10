@@ -2254,6 +2254,10 @@ duk_bool_t duk_is_array(duk_context *ctx, duk_idx_t index) {
 }
 
 duk_bool_t duk_is_function(duk_context *ctx, duk_idx_t index) {
+	duk_tval *tv = duk_get_tval(ctx, index);
+	if (tv && DUK_TVAL_IS_LIGHTFUNC(tv)) {
+		return 1;
+	}
 	return duk__obj_flag_any_default_false(ctx,
 	                                       index,
 	                                       DUK_HOBJECT_FLAG_COMPILEDFUNCTION |
@@ -2287,11 +2291,7 @@ duk_bool_t duk_is_thread(duk_context *ctx, duk_idx_t index) {
 
 duk_bool_t duk_is_callable(duk_context *ctx, duk_idx_t index) {
 	/* XXX: currently same as duk_is_function() */
-	return duk__obj_flag_any_default_false(ctx,
-	                                       index,
-	                                       DUK_HOBJECT_FLAG_COMPILEDFUNCTION |
-	                                       DUK_HOBJECT_FLAG_NATIVEFUNCTION |
-	                                       DUK_HOBJECT_FLAG_BOUND);
+	return duk_is_function(ctx, index);
 }
 
 duk_bool_t duk_is_dynamic(duk_context *ctx, duk_idx_t index) {
