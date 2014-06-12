@@ -2177,15 +2177,19 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 			 */
 
 			tv_obj = DUK__REGCONSTP(b);
+			duk_push_tval(ctx, tv_obj);
 			tv_key = DUK__REGCONSTP(c);
+			duk_push_tval(ctx, tv_key);
+
 			DUK_DDD(DUK_DDDPRINT("GETPROP: a=%d obj=%!T, key=%!T", a, DUK__REGCONSTP(b), DUK__REGCONSTP(c)));
-			rc = duk_hobject_getprop(thr, tv_obj, tv_key);  /* -> [val] */
+			rc = duk_get_prop_internal(thr, -2, -1);  /* -> [ obj key val ] */
 			DUK_UNREF(rc);  /* ignore */
 			DUK_DDD(DUK_DDDPRINT("GETPROP --> %!T", duk_get_tval(ctx, -1)));
 			tv_obj = NULL;  /* invalidated */
 			tv_key = NULL;  /* invalidated */
 
 			duk_replace(ctx, a);    /* val */
+			duk_pop_2(ctx);
 			break;
 		}
 
@@ -2261,8 +2265,10 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 			/* FIXME: allow object to be a const, e.g. in 'foo'.toString() */
 
 			tv_obj = DUK__REGP(b);
+			duk_push_tval(ctx, tv_obj);
 			tv_key = DUK__REGCONSTP(c);
-			rc = duk_hobject_getprop(thr, tv_obj, tv_key);  /* -> [val] */
+			duk_push_tval(ctx, tv_key);
+			rc = duk_get_prop_internal(thr, -2, -1);  /* -> [ obj key val ] */
 			DUK_UNREF(rc);  /* unused */
 			tv_obj = NULL;  /* invalidated */
 			tv_key = NULL;  /* invalidated */
@@ -2279,9 +2285,10 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 				a = (int) DUK_TVAL_GET_NUMBER(tv_ind);  /* not validated */
 			}
 
-			duk_push_tval(ctx, DUK__REGP(b));  /* [ ... val obj ] */
-			duk_replace(ctx, a+1);        /* 'this' binding */
+			/* [ obj key val ] */
 			duk_replace(ctx, a);          /* val */
+			duk_pop(ctx);
+			duk_replace(ctx, a+1);        /* obj -> 'this' binding */
 			break;
 		}
 

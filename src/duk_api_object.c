@@ -12,22 +12,12 @@
  *  defineProperty, getOwnPropertyDescriptor).
  */
 
-int duk_get_prop(duk_context *ctx, int obj_index) {
-	duk_hthread *thr = (duk_hthread *) ctx;
-	duk_tval *tv_obj;
-	duk_tval *tv_key;
-	int rc;
+duk_ret_t duk_get_prop(duk_context *ctx, int obj_index) {
+	duk_ret_t rc;
 
 	DUK_ASSERT(ctx != NULL);
 
-	/* Note: copying tv_obj and tv_key to locals to shield against a valstack
-	 * resize is not necessary for a property get right now.
-	 */
-
-	tv_obj = duk_require_tval(ctx, obj_index);
-	tv_key = duk_require_tval(ctx, -1);
-
-	rc = duk_hobject_getprop(thr, tv_obj, tv_key);
+	rc = duk_get_prop_internal(ctx, obj_index, -1);
 	/* a value is left on stack regardless of rc */
 
 	duk_remove(ctx, -2);  /* remove key */
@@ -47,7 +37,7 @@ int duk_get_prop_index(duk_context *ctx, int obj_index, unsigned int arr_index) 
 	DUK_ASSERT(ctx != NULL);
 
 	obj_index = duk_require_normalize_index(ctx, obj_index);
-	duk_push_number(ctx, (double) arr_index);
+	duk_push_number(ctx, (double) arr_index);  /* XXX: duk_push_uint? */
 	return duk_get_prop(ctx, obj_index);
 }
 

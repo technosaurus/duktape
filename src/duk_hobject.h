@@ -652,7 +652,7 @@ duk_tval *duk_hobject_find_existing_entry_tval_ptr_and_attrs(duk_hobject *obj, d
 duk_tval *duk_hobject_find_existing_array_entry_tval_ptr(duk_hobject *obj, duk_uint32_t i);
 
 /* core property functions */
-int duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, duk_tval *tv_key);
+duk_ret_t duk_get_prop_internal(duk_context *ctx, duk_idx_t obj_index, duk_idx_t key_index);
 int duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, duk_tval *tv_key, duk_tval *tv_val, int throw_flag);
 int duk_hobject_delprop(duk_hthread *thr, duk_tval *tv_obj, duk_tval *tv_key, int throw_flag);
 int duk_hobject_hasprop(duk_hthread *thr, duk_tval *tv_obj, duk_tval *tv_key);

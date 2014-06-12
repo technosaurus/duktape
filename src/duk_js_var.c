@@ -1156,8 +1156,6 @@ static int duk__getvar_helper(duk_hthread *thr,
                               int throw_flag) {
 	duk_context *ctx = (duk_context *) thr;
 	duk__id_lookup_result ref;
-	duk_tval tv_tmp_obj;
-	duk_tval tv_tmp_key;
 	int parents;
 
 	DUK_DDD(DUK_DDDPRINT("getvar: thr=%p, env=%p, act=%p, name=%!O "
@@ -1191,13 +1189,14 @@ static int duk__getvar_helper(duk_hthread *thr,
 				duk_push_undefined(ctx);
 			}
 
-			DUK_TVAL_SET_OBJECT(&tv_tmp_obj, ref.holder);
-			DUK_TVAL_SET_STRING(&tv_tmp_key, name);
-			(void) duk_hobject_getprop(thr, &tv_tmp_obj, &tv_tmp_key);  /* [this value] */
+			duk_push_hobject(ctx, ref.holder);
+			duk_push_hstring(ctx, name);
+			(void) duk_get_prop_internal(ctx, -2, -1);  /* [ this holder name value ] */
 
-			/* ref.value, ref.this.binding invalidated here by getprop call */
+			/* ref.value, ref.this_binding invalidated here by getprop call */
 
-			duk_insert(ctx, -2);  /* [this value] -> [value this] */
+			duk_insert(ctx, -4);  /* -> [ value this holder name ] */
+			duk_pop_2(ctx);       /* -> [ value this ] */
 		}
 
 		return 1;

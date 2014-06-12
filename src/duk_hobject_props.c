@@ -1900,24 +1900,25 @@ static duk_tval *duk__shallow_fast_path_array_check_tval(duk_hobject *obj, duk_t
  *  GETPROP: Ecmascript property read.
  */
 
-int duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, duk_tval *tv_key) {
-	duk_context *ctx = (duk_context *) thr;
+duk_ret_t duk_get_prop_internal(duk_context *ctx, duk_idx_t obj_index, duk_idx_t key_index) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_tval tv_obj_copy;
 	duk_tval tv_key_copy;
+	duk_tval *tv_obj;
+	duk_tval *tv_key;
 	duk_hobject *curr = NULL;
 	duk_hstring *key = NULL;
 	duk_uint32_t arr_idx = DUK__NO_ARRAY_INDEX;
 	duk_propdesc desc;
 	duk_uint32_t sanity;
 
-	DUK_DDD(DUK_DDDPRINT("getprop: thr=%p, obj=%p, key=%p (obj -> %!T, key -> %!T)",
-	                     (void *) thr, (void *) tv_obj, (void *) tv_key, tv_obj, tv_key));
+	DUK_DDD(DUK_DDDPRINT("getprop: ctx=%p, obj_index=%d, key_index=%d (obj -> %!T, key -> %!T)",
+	                     (void *) ctx, (int) obj_index, (int) key_index,
+	                     duk_get_tval(ctx, obj_index), duk_get_tval(ctx, key_index)));
 
 	DUK_ASSERT(ctx != NULL);
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(thr->heap != NULL);
-	DUK_ASSERT(tv_obj != NULL);
-	DUK_ASSERT(tv_key != NULL);
 
 	DUK_ASSERT_VALSTACK_SPACE(thr, DUK__VALSTACK_SPACE);
 
@@ -1930,6 +1931,8 @@ int duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, duk_tval *tv_key) {
 	 *  be a better solution overall).
 	 */
 
+	tv_obj = duk_require_tval(ctx, obj_index);
+	tv_key = duk_require_tval(ctx, key_index);
 	DUK_TVAL_SET_TVAL(&tv_obj_copy, tv_obj);
 	DUK_TVAL_SET_TVAL(&tv_key_copy, tv_key);
 	tv_obj = &tv_obj_copy;
@@ -4046,7 +4049,7 @@ duk_uint32_t duk_hobject_get_length(duk_hthread *thr, duk_hobject *obj) {
 	double val;
 	duk_push_hobject(ctx, obj);
 	duk_push_hstring_stridx(ctx, DUK_STRIDX_LENGTH);
-	(void) duk_hobject_getprop(thr, duk_get_tval(ctx, -2), duk_get_tval(ctx, -1));
+	(void) duk_get_prop_internal(thr, -2, -1);
 	val = duk_to_number(ctx, -1);
 	duk_pop_n(ctx, 3);
 	if (val >= 0.0 && val < 4294967296.0) {  /* XXX: constant */
