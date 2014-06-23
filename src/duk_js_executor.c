@@ -375,6 +375,25 @@ static void duk__vm_arith_unary_op(duk_hthread *thr, duk_tval *tv_x, duk_small_u
 	DUK_ASSERT_DISABLE(idx_z >= 0);  /* unsigned */
 	DUK_ASSERT((duk_uint_t) idx_z < (duk_uint_t) duk_get_top(ctx));
 
+	if (DUK_TVAL_IS_NUMBER_FASTINT(tv_x)) {
+		/* fast path */
+		duk_int64_t v1 = DUK_TVAL_GET_NUMBER_FASTINT(tv_x);
+		if (opcode == DUK_EXTRAOP_INC) {
+			/* FIXME: just example for INC */
+			v1++;
+			if (v1 < DUK_FASTINT_MAX) {
+				tv_z = &thr->valstack_bottom[idx_z];
+				DUK_TVAL_SET_TVAL(&tv_tmp, tv_z);
+				DUK_TVAL_SET_NUMBER_FASTINT(tv_z, v1);
+				DUK_ASSERT(!DUK_TVAL_IS_HEAP_ALLOCATED(tv_z));  /* no need to incref */
+				DUK_TVAL_DECREF(thr, &tv_tmp);   /* side effects */
+				return;
+			}
+		}
+
+		/* fall through if overflow etc */
+	}
+
 	if (DUK_TVAL_IS_NUMBER(tv_x)) {
 		/* fast path */
 		d1 = DUK_TVAL_GET_NUMBER(tv_x);
