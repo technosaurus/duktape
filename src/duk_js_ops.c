@@ -768,6 +768,30 @@ duk_bool_t duk_js_compare_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_
 	duk_small_int_t rc;
 	duk_bool_t retval;
 
+	/* Very often compared values are plain integers, so handle that
+	 * case as a fast path without any stack operations and such.
+	 */
+#if 1
+	if (DUK_TVAL_IS_NUMBER_FASTINT(tv_x) && DUK_TVAL_IS_NUMBER_FASTINT(tv_y)) {
+		duk_int64_t v1 = DUK_TVAL_GET_NUMBER_FASTINT(tv_x);
+		duk_int64_t v2 = DUK_TVAL_GET_NUMBER_FASTINT(tv_y);
+		if (v1 < v2) {
+			/* 'lt is true' */
+			retval = 1;
+		} else {
+			retval = 0;
+		}
+		if (flags & DUK_COMPARE_FLAG_NEGATE) {
+			retval ^= 1;
+		}
+		return retval;
+	}
+#endif
+
+	/* FIXME: non-integer-number fast path can also be added here
+	 * if useful?
+	 */
+
 	duk_push_tval(ctx, tv_x);
 	duk_push_tval(ctx, tv_y);
 
