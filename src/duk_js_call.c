@@ -1360,7 +1360,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	DUK_ASSERT((thr->state == DUK_HTHREAD_STATE_INACTIVE && thr->heap->curr_thread == NULL) ||  /* first call */
 	           (thr->state == DUK_HTHREAD_STATE_INACTIVE && thr->heap->curr_thread != NULL) ||  /* other call */
 	           (thr->state == DUK_HTHREAD_STATE_RUNNING && thr->heap->curr_thread == thr));     /* current thread */
-	
+
 	thr->heap->call_recursion_depth = entry_call_recursion_depth;
 
 	return retval;
