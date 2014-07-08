@@ -127,7 +127,7 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 		DUK_ASSERT((duk_size_t) idx < thr->callstack_size);  /* true, despite side effect resizes */
 
 		p = thr->callstack + idx;
-		DUK_ASSERT(p->func != NULL);
+		/* With lightfuncs, p->func may be NULL */
 
 #ifdef DUK_USE_NONSTD_FUNC_CALLER_PROPERTY
 		/*
@@ -185,6 +185,8 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 			DUK_DDD(DUK_DDDPRINT("skip closing environments, envs not owned by this activation"));
 			goto skip_env_close;
 		}
+
+		/* FIXME: lightfunc handling, explicit check or comment */
 
 		DUK_ASSERT(p->lex_env == p->var_env);
 		if (p->var_env != NULL) {

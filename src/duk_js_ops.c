@@ -1131,7 +1131,7 @@ duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
 		break;
 	}
 	case DUK_TAG_LIGHTFUNC: {
-		idx = DUK_STRIDX_LC_FUNCTION;
+		stridx = DUK_STRIDX_LC_FUNCTION;
 		break;
 	}
 	default: {

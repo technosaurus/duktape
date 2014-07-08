@@ -2667,7 +2667,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 
 			/* FIXME: lightfunc hack, actual implementation needs a refactoring */
 			if (DUK_TVAL_IS_LIGHTFUNC(tv_func)) {
-				duk_set_top(ctx, b + c + 2);   /* [ ... func this arg1 ... argN ] */
+				duk_set_top(ctx, idx + c + 2);   /* [ ... func this arg1 ... argN ] */
 
 				call_flags = 0;  /* not protected, respect reclimit, not constructor */
 

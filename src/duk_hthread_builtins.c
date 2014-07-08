@@ -406,7 +406,7 @@ void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			magic = (duk_int16_t) duk_bd_decode_flagged(bd, DUK__MAGIC_BITS, 0);
 
 #if 1  /* FIXME: lightfunc testing hack */
-			if (c_length == c_nargs && c_nargs != DUK_VARARGS && magic == 0) {
+			if ((duk_int_t) c_length == c_nargs && c_nargs != DUK_VARARGS && magic == 0) {
 				/* FIXME: how many bits for magic? since activation doesn't store
 				 * lightfunc now, allow only magic=0 here.
 				 */
