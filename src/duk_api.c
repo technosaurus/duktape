@@ -881,6 +881,7 @@ void duk_xmove(duk_context *to_ctx, duk_context *from_ctx, duk_idx_t count) {
 	if (nbytes == 0) {
 		return;
 	}
+	DUK_ASSERT(count > 0);
 	DUK_ASSERT(thr->valstack_top <= thr->valstack_end);
 
 	if ((duk_size_t) ((duk_uint8_t *) thr->valstack_end - (duk_uint8_t *) thr->valstack_top) < nbytes) {
@@ -904,6 +905,7 @@ void duk_xmove(duk_context *to_ctx, duk_context *from_ctx, duk_idx_t count) {
 	}
 
 	/* remove values from the source stack */
+	DUK_ASSERT(count > 0);  /* -count is a valid rel index because of this */
 	duk_set_top(from_ctx, -count);
 }
 
