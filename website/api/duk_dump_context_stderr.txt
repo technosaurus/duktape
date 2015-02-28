@@ -21,3 +21,7 @@ duk_dump_context_stderr(ctx);
 =tags
 stack
 debug
+nonportable
+
+=introduced
+1.0.0

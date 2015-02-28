@@ -17,10 +17,13 @@
  * 'data' buffer might be an issue).  Currently only counts and sizes and
  * such are given so there should not be a security impact.
  */
-duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_tval *tv;
 	duk_heaphdr *h;
 	duk_int_t i, n;
+
+	DUK_UNREF(thr);
 
 	tv = duk_get_tval(ctx, 0);
 	DUK_ASSERT(tv != NULL);  /* because arg count is 1 */
@@ -69,7 +72,7 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 		}
 		duk_push_uint(ctx, (duk_uint_t) hdr_size);
 		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_E_ALLOC_SIZE(h_obj));
-		duk_push_uint(ctx, (duk_uint_t) h_obj->e_size);
+		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_GET_ESIZE(h_obj));
 		/* Note: e_next indicates the number of gc-reachable entries
 		 * in the entry part, and also indicates the index where the
 		 * next new property would be inserted.  It does *not* indicate
@@ -77,11 +80,11 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 		 * value could be counted separately but requires a pass through
 		 * the key list.
 		 */
-		duk_push_uint(ctx, (duk_uint_t) h_obj->e_next);
-		duk_push_uint(ctx, (duk_uint_t) h_obj->a_size);
-		duk_push_uint(ctx, (duk_uint_t) h_obj->h_size);
+		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_GET_ENEXT(h_obj));
+		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_GET_ASIZE(h_obj));
+		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_GET_HSIZE(h_obj));
 		if (DUK_HOBJECT_IS_COMPILEDFUNCTION(h_obj)) {
-			duk_hbuffer *h_data = ((duk_hcompiledfunction *) h_obj)->data;
+			duk_hbuffer *h_data = (duk_hbuffer *) DUK_HCOMPILEDFUNCTION_GET_DATA(thr->heap, (duk_hcompiledfunction *) h_obj);
 			if (h_data) {
 				duk_push_uint(ctx, (duk_uint_t) DUK_HBUFFER_GET_SIZE(h_data));
 			} else {
@@ -93,7 +96,7 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 	case DUK_HTYPE_BUFFER: {
 		duk_hbuffer *h_buf = (duk_hbuffer *) h;
 		if (DUK_HBUFFER_HAS_DYNAMIC(h_buf)) {
-			/* XXX: when usable_size == 0, dynamic buf ptr may now be NULL, in which case
+			/* XXX: when alloc_size == 0, dynamic buf ptr may now be NULL, in which case
 			 * the second allocation does not exist.
 			 */
 			duk_hbuffer_dynamic *h_dyn = (duk_hbuffer_dynamic *) h;
@@ -109,7 +112,7 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 
  done:
 	/* set values into ret array */
-	/* FIXME: primitive to make array from valstack slice */
+	/* XXX: primitive to make array from valstack slice */
 	n = duk_get_top(ctx);
 	for (i = 2; i < n; i++) {
 		duk_dup(ctx, i);
@@ -119,10 +122,9 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
-	duk_hobject *h_func;
 	duk_uint_fast32_t pc;
 	duk_uint_fast32_t line;
 	duk_int_t level;
@@ -139,14 +141,16 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 
 	duk_push_object(ctx);
 
-	h_func = act->func;
-	DUK_ASSERT(h_func != NULL);
-	duk_push_hobject(ctx, h_func);
+	duk_push_tval(ctx, &act->tv_func);
 
 	pc = (duk_uint_fast32_t) act->pc;
 	duk_push_uint(ctx, (duk_uint_t) pc);
 
+#if defined(DUK_USE_PC2LINE)
 	line = duk_hobject_pc2line_query(ctx, -2, pc);
+#else
+	line = 0;
+#endif
 	duk_push_uint(ctx, (duk_uint_t) line);
 
 	/* Providing access to e.g. act->lex_env would be dangerous: these
@@ -157,14 +161,14 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 
 	/* [ level obj func pc line ] */
 
-	/* FIXME: version specific array format instead? */
-	duk_def_prop_stridx_wec(ctx, -4, DUK_STRIDX_LINE_NUMBER);
-	duk_def_prop_stridx_wec(ctx, -3, DUK_STRIDX_PC);
-	duk_def_prop_stridx_wec(ctx, -2, DUK_STRIDX_LC_FUNCTION);
+	/* XXX: version specific array format instead? */
+	duk_xdef_prop_stridx_wec(ctx, -4, DUK_STRIDX_LINE_NUMBER);
+	duk_xdef_prop_stridx_wec(ctx, -3, DUK_STRIDX_PC);
+	duk_xdef_prop_stridx_wec(ctx, -2, DUK_STRIDX_LC_FUNCTION);
 	return 1;
 }
 
-duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
 #ifdef DUK_USE_MARK_AND_SWEEP
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_small_uint_t flags;
@@ -172,7 +176,11 @@ duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
 
 	flags = (duk_small_uint_t) duk_get_uint(ctx, 0);
 	rc = duk_heap_mark_and_sweep(thr->heap, flags);
-	duk_push_boolean(ctx, rc);
+
+	/* XXX: Not sure what the best return value would be in the API.
+	 * Return a boolean for now.  Note that rc == 0 is success (true).
+	 */
+	duk_push_boolean(ctx, !rc);
 	return 1;
 #else
 	DUK_UNREF(ctx);
@@ -180,7 +188,7 @@ duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
 #endif
 }
 
-duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx) {
 	(void) duk_require_hobject(ctx, 0);
 	if (duk_get_top(ctx) >= 2) {
 		/* Set: currently a finalizer is disabled by setting it to
@@ -200,7 +208,7 @@ duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx) {
 	}
 }
 
-duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hstring *h_str;
 
@@ -245,7 +253,7 @@ duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hstring *h_str;
 
@@ -289,7 +297,7 @@ duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
  *  Compact an object
  */
 
-duk_ret_t duk_bi_duktape_object_compact(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_duktape_object_compact(duk_context *ctx) {
 	DUK_ASSERT_TOP(ctx, 1);
 	duk_compact(ctx, 0);
 	return 1;  /* return the argument object */

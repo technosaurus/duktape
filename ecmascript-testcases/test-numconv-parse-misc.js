@@ -1,9 +1,3 @@
-/*---
-{
-    "knownissue": "rounding corner case for 1e+23 (parses/prints as 1.0000000000000001e+23)"
-}
----*/
-
 /*===
 0.1
 0.1
@@ -74,7 +68,6 @@ function miscTest() {
         }
     }
 
- 
     // parseFloat() allows fractions without leading integer digit
     pFloat('0.1');
     pFloat('.1');
@@ -147,4 +140,3 @@ try {
 } catch (e) {
     print(e);
 }
-

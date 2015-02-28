@@ -29,3 +29,7 @@ duk_pop(ctx);
 =tags
 property
 call
+protected
+
+=introduced
+1.0.0

@@ -27,7 +27,7 @@
  *
  *  Note: macro naming is a bit misleading, e.g. "ABC" in macro name but
  *  the field layout is logically "CBA".
- */ 
+ */
 
 typedef duk_uint32_t duk_instr_t;
 
@@ -74,7 +74,7 @@ typedef duk_uint32_t duk_instr_t;
 #define DUK_BC_EXTRAOP_MIN          DUK_BC_A_MIN
 #define DUK_BC_EXTRAOP_MAX          DUK_BC_A_MAX
 
-#define DUK_OP_LDREG                0 
+#define DUK_OP_LDREG                0
 #define DUK_OP_STREG                1
 #define DUK_OP_LDCONST              2
 #define DUK_OP_LDINT                3
@@ -167,12 +167,12 @@ typedef duk_uint32_t duk_instr_t;
 #define DUK_EXTRAOP_UNP             24
 #define DUK_EXTRAOP_INC             25
 #define DUK_EXTRAOP_DEC             26
+#define DUK_EXTRAOP_DEBUGGER        27
 
 /* DUK_OP_EXTRA for debugging */
 #define DUK_EXTRAOP_DUMPREG         128
 #define DUK_EXTRAOP_DUMPREGS        129
-#define DUK_EXTRAOP_DUMPTHREAD      130
-#define DUK_EXTRAOP_LOGMARK         131
+#define DUK_EXTRAOP_LOGMARK         130
 
 /* DUK_OP_CALL flags in A */
 #define DUK_BC_CALL_FLAG_TAILCALL           (1 << 0)
@@ -201,4 +201,3 @@ typedef duk_uint32_t duk_instr_t;
 #define DUK_BC_JUMP_BIAS            (1L << 25)
 
 #endif  /* DUK_JS_BYTECODE_H_INCLUDED */
-

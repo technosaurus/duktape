@@ -13,16 +13,25 @@ code and shields them from internal details like value representation.
 its core concepts.  If you're new to Duktape, please read the
 <a href="guide.html">Duktape Programmer's Guide</a> first.</p>
 
-<div class="note">
-The API will be in flux until 1.0 release.
-</div>
-
 <h2>Searching for functions using browser search</h2>
 
 <p>You can use browser search (typically CTRL-F) to search for
 function definitions by prepending a dot to the search term.  For instance,
 use ".duk_example_func" to look for <code>duk_example_func()</code>.  In most
 browsers only the actual section defining the function should be found.</p>
+
+<h2>Portability</h2>
+
+<p>Some convenience API calls are not fully portable because they involve
+file I/O to the filesystem or <code>stdout</code>/<code>stderr</code>.  If
+you want to keep your code maximally portable, avoid these calls.  The
+non-portable calls are marked with a <code>nonportable</code> tag.</p>
+
+<div class="note">
+Because the Duktape core APIs are intended to be maximally portable, the
+nonportable calls may be moved to an optional utility library in future
+versions for clarity.
+</div>
 
 <h2>API safety</h2>
 
@@ -35,6 +44,17 @@ Unless stated otherwise, it is not checked and is required to be
 non-<code>NULL</code> or unsafe behavior may occur.  This is the case
 because explicit checks for the argument would increase code footprint
 for little practical gain.</p>
+
+<p>Also see <a href="guide.html#error-handling">Error handling</a> best
+practices, especially to avoid uncaught errors which lead to difficult
+to diagnose fatal errors.</p>
+
+<h2>API calls may be macros</h2>
+
+<p>All Duktape API calls are potentially macros.  The implementation of a
+certain API call may change between a macro and an actual function even
+between compatible releases.  See <a href="guide.html#duktape-api">Duktape API</a>
+for more discussion.</p>
 
 <h2>Minimal Duktape program</h2>
 
@@ -50,4 +70,3 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 </pre>
-

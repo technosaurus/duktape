@@ -6,7 +6,8 @@
 
 #ifdef DUK_USE_DEBUG
 
-static void duk__sanitize_snippet(char *buf, duk_size_t buf_size, duk_hstring *str) {
+#if 0  /*unused*/
+DUK_LOCAL void duk__sanitize_snippet(char *buf, duk_size_t buf_size, duk_hstring *str) {
 	duk_size_t i;
 	duk_size_t nchars;
 	duk_size_t maxchars;
@@ -25,8 +26,10 @@ static void duk__sanitize_snippet(char *buf, duk_size_t buf_size, duk_hstring *s
 		buf[i] = (char) c;
 	}
 }
+#endif
 
-static const char *duk__get_heap_type_string(duk_heaphdr *hdr) {
+#if 0
+DUK_LOCAL const char *duk__get_heap_type_string(duk_heaphdr *hdr) {
 	switch (DUK_HEAPHDR_GET_TYPE(hdr)) {
 	case DUK_HTYPE_STRING:
 		return "string";
@@ -38,8 +41,14 @@ static const char *duk__get_heap_type_string(duk_heaphdr *hdr) {
 		return "???";
 	}
 }
+#endif
 
-static void duk__dump_indented(duk_heaphdr *obj, int index) {
+#if 0
+DUK_LOCAL void duk__dump_indented(duk_heaphdr *obj, int index) {
+	DUK_UNREF(obj);
+	DUK_UNREF(index);
+	DUK_UNREF(duk__get_heap_type_string);
+
 #ifdef DUK_USE_REFERENCE_COUNTING
 	DUK_D(DUK_DPRINT("  [%ld]: %p %s (flags: 0x%08lx, ref: %ld) -> %!O",
 	                 (long) index,
@@ -57,12 +66,15 @@ static void duk__dump_indented(duk_heaphdr *obj, int index) {
 	                 (duk_heaphdr *) obj));
 #endif
 }
+#endif
 
-static void duk__dump_heaphdr_list(duk_heap *heap, duk_heaphdr *root, const char *name) {
+#if 0  /*unused*/
+DUK_LOCAL void duk__dump_heaphdr_list(duk_heap *heap, duk_heaphdr *root, const char *name) {
 	duk_int_t count;
 	duk_heaphdr *curr;
 
 	DUK_UNREF(heap);
+	DUK_UNREF(name);
 
 	count = 0;
 	curr = root;
@@ -81,19 +93,21 @@ static void duk__dump_heaphdr_list(duk_heap *heap, duk_heaphdr *root, const char
 		curr = DUK_HEAPHDR_GET_NEXT(curr);
 	}
 }
+#endif
 
-static void duk__dump_stringtable(duk_heap *heap) {
+#if 0  /*unused*/
+DUK_LOCAL void duk__dump_stringtable(duk_heap *heap) {
 	duk_uint_fast32_t i;
 	char buf[64+1];
 
 	DUK_D(DUK_DPRINT("stringtable %p, used %ld, size %ld, load %ld%%",
-	                 (void *) heap->st,
+	                 (void *) heap->strtable,
 	                 (long) heap->st_used,
 	                 (long) heap->st_size,
 	                 (long) (((double) heap->st_used) / ((double) heap->st_size) * 100.0)));
 
 	for (i = 0; i < (duk_uint_fast32_t) heap->st_size; i++) {
-		duk_hstring *e = heap->st[i];
+		duk_hstring *e = heap->strtable[i];
 
 		if (!e) {
 			DUK_D(DUK_DPRINT("  [%ld]: NULL", (long) i));
@@ -137,8 +151,10 @@ static void duk__dump_stringtable(duk_heap *heap) {
 		}
 	}
 }
+#endif
 
-static void duk__dump_strcache(duk_heap *heap) {
+#if 0  /*unused*/
+DUK_LOCAL void duk__dump_strcache(duk_heap *heap) {
 	duk_uint_fast32_t i;
 	char buf[64+1];
 
@@ -154,10 +170,12 @@ static void duk__dump_strcache(duk_heap *heap) {
 			DUK_D(DUK_DPRINT("  [%ld]: bidx=%ld cidx=%ld str=%s",
 			                 (long) i, (long) c->bidx, (long) c->cidx, (const char *) buf));
 		}
-	} 
+	}
 }
+#endif
 
-void duk_debug_dump_heap(duk_heap *heap) {
+#if 0  /*unused*/
+DUK_INTERNAL void duk_debug_dump_heap(duk_heap *heap) {
 	char buf[64+1];
 
 	DUK_D(DUK_DPRINT("=== heap %p ===", (void *) heap));
@@ -168,19 +186,19 @@ void duk_debug_dump_heap(duk_heap *heap) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-pedantic"
 #endif
-	duk_debug_format_funcptr(buf, sizeof(buf), (unsigned char *) &heap->alloc_func, sizeof(heap->alloc_func));
+	duk_debug_format_funcptr(buf, sizeof(buf), (duk_uint8_t *) &heap->alloc_func, sizeof(heap->alloc_func));
 	DUK_D(DUK_DPRINT("  alloc_func: %s", (const char *) buf));
-	duk_debug_format_funcptr(buf, sizeof(buf), (unsigned char *) &heap->realloc_func, sizeof(heap->realloc_func));
+	duk_debug_format_funcptr(buf, sizeof(buf), (duk_uint8_t *) &heap->realloc_func, sizeof(heap->realloc_func));
 	DUK_D(DUK_DPRINT("  realloc_func: %s", (const char *) buf));
-	duk_debug_format_funcptr(buf, sizeof(buf), (unsigned char *) &heap->free_func, sizeof(heap->free_func));
+	duk_debug_format_funcptr(buf, sizeof(buf), (duk_uint8_t *) &heap->free_func, sizeof(heap->free_func));
 	DUK_D(DUK_DPRINT("  free_func: %s", (const char *) buf));
-	duk_debug_format_funcptr(buf, sizeof(buf), (unsigned char *) &heap->fatal_func, sizeof(heap->fatal_func));
+	duk_debug_format_funcptr(buf, sizeof(buf), (duk_uint8_t *) &heap->fatal_func, sizeof(heap->fatal_func));
 	DUK_D(DUK_DPRINT("  fatal_func: %s", (const char *) buf));
 #ifdef DUK_USE_GCC_PRAGMAS
 #pragma GCC diagnostic pop
 #endif
 
-	DUK_D(DUK_DPRINT("  alloc_udata: %p", (void *) heap->alloc_udata));
+	DUK_D(DUK_DPRINT("  heap_udata: %p", (void *) heap->heap_udata));
 
 #ifdef DUK_USE_MARK_AND_SWEEP
 #ifdef DUK_USE_VOLUNTARY_GC
@@ -224,5 +242,6 @@ void duk_debug_dump_heap(duk_heap *heap) {
 
 	/* heap->strs: not worth dumping */
 }
+#endif
 
 #endif  /* DUK_USE_DEBUG */

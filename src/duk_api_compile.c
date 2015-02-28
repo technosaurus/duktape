@@ -12,7 +12,7 @@ struct duk__compile_raw_args {
 };
 
 /* Eval is just a wrapper now. */
-duk_int_t duk_eval_raw(duk_context *ctx, const char *src_buffer, duk_size_t src_length, duk_uint_t flags) {
+DUK_EXTERNAL duk_int_t duk_eval_raw(duk_context *ctx, const char *src_buffer, duk_size_t src_length, duk_uint_t flags) {
 	duk_uint_t comp_flags;
 	duk_int_t rc;
 
@@ -54,7 +54,7 @@ duk_int_t duk_eval_raw(duk_context *ctx, const char *src_buffer, duk_size_t src_
 }
 
 /* Helper which can be called both directly and with duk_safe_call(). */
-static duk_ret_t duk__do_compile(duk_context *ctx) {
+DUK_LOCAL duk_ret_t duk__do_compile(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk__compile_raw_args *comp_args;
 	duk_uint_t flags;
@@ -79,10 +79,16 @@ static duk_ret_t duk__do_compile(duk_context *ctx) {
 	if (!comp_args->src_buffer) {
 		duk_hstring *h_sourcecode;
 
-		if (flags & DUK_COMPILE_NOSOURCE) {
-			DUK_ERROR(thr, DUK_ERR_API_ERROR, "no sourcecode");
+		h_sourcecode = duk_get_hstring(ctx, -2);
+		if ((flags & DUK_COMPILE_NOSOURCE) ||  /* args incorrect */
+		    (h_sourcecode == NULL)) {          /* e.g. duk_push_file_string_raw() pushed undefined */
+			/* XXX: when this error is caused by a nonexistent
+			 * file given to duk_peval_file() or similar, the
+			 * error message is not the best possible.
+			 */
+			DUK_ERROR(thr, DUK_ERR_API_ERROR, DUK_STR_NO_SOURCECODE);
 		}
-		h_sourcecode = duk_require_hstring(ctx, -2);
+		DUK_ASSERT(h_sourcecode != NULL);
 		comp_args->src_buffer = (const duk_uint8_t *) DUK_HSTRING_GET_DATA(h_sourcecode);
 		comp_args->src_length = (duk_size_t) DUK_HSTRING_GET_BYTELEN(h_sourcecode);
 	}
@@ -128,7 +134,7 @@ static duk_ret_t duk__do_compile(duk_context *ctx) {
 	return 1;
 }
 
-duk_int_t duk_compile_raw(duk_context *ctx, const char *src_buffer, duk_size_t src_length, duk_uint_t flags) {
+DUK_EXTERNAL duk_int_t duk_compile_raw(duk_context *ctx, const char *src_buffer, duk_size_t src_length, duk_uint_t flags) {
 	duk__compile_raw_args comp_args_alloc;
 	duk__compile_raw_args *comp_args = &comp_args_alloc;
 

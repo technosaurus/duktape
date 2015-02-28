@@ -127,9 +127,8 @@ for (i = 0; i - h; i += 1) {
             }
         }
 
-	res = res + ' ' + colors[k];
+        res = res + ' ' + colors[k];
     }
 
     print(res);
 }
-

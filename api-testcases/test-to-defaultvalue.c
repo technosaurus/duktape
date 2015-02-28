@@ -6,14 +6,14 @@ index 1, type 6 -> 4, result: 123
 index 2, type 6 -> 3, result: true
 ==> rc=0, result='undefined'
 *** test_2 (duk_safe_call)
-==> rc=1, result='TypeError: not object'
+==> rc=1, result='TypeError: unexpected type'
 *** test_3 (duk_safe_call)
 ==> rc=1, result='Error: invalid index'
 *** test_4 (duk_safe_call)
 ==> rc=1, result='Error: invalid index'
 ===*/
 
-/* FIXME: this test is missing a lot of coverage, like different hints,
+/* XXX: this test is missing a lot of coverage, like different hints,
  * different kinds of objects.  Much of this behavior is tested by the
  * Ecmascript tests.
  */

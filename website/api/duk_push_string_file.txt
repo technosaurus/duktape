@@ -20,3 +20,7 @@ duk_push_string_file(ctx, "test.js");
 =tags
 stack
 string
+nonportable
+
+=introduced
+1.0.0

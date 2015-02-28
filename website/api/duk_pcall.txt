@@ -56,7 +56,11 @@ duk_pop(ctx);
 
 =tags
 call
+protected
 
 =seealso
 duk_pcall_method
 duk_pcall_prop
+
+=introduced
+1.0.0

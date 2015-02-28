@@ -14,8 +14,7 @@
 
 /*---
 {
-    "nonstandard": true,
-    "specialoptions": "DUK_OPT_NONSTD_FUNC_CALLER_PROPERTY"
+    "nonstandard": true
 }
 ---*/
 
@@ -667,4 +666,3 @@ try {
 } catch (e) {
     print(e);
 }
-

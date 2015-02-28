@@ -14,6 +14,10 @@ properties and the <code>Proxy</code> object.</p>
 captured by a user function.  Setter/getter functions can be both Ecmascript
 and Duktape/C functions.</p>
 
+<p>Accessors are set up using <code>Object.defineProperty()</code> or
+<code>Object.defineProperties()</code> from Ecmascript code, or using
+<code><a href="api.html#duk_def_prop">duk_def_prop()</a></code> from C code.</p>
+
 <h3>Example</h3>
 
 <p>To capture writes to <code>obj.color</code> so that you can validate the
@@ -135,7 +139,7 @@ duk_put_prop_string(ctx, -2, "key");
 <p>The Duktape/C getter function would then (similarly for the setter):</p>
 
 <pre class="c-code">
-static int my_getter(duk_context *ctx) {
+static duk_ret_t my_getter(duk_context *ctx) {
     const char *key;
 
     /* There are no positional arguments for the getter. */

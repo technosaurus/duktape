@@ -37,7 +37,7 @@
  *  Indexes of various types (8-bit, 16-bit, 32-bit) in memory relative to
  *  the logical (big endian) order:
  *
- *  byte order      duk_uint8_t    duk_uint16_t     duk_uint32_t    
+ *  byte order      duk_uint8_t    duk_uint16_t     duk_uint32_t
  *    BE             01234567         0123               01
  *    LE             76543210         3210               10
  *    ME (ARM)       32107654         1032               01
@@ -308,5 +308,32 @@ typedef union duk_double_union duk_double_union;
 		(u)->d = DUK_DOUBLE_NAN; \
 	} while (0)
 #endif  /* DUK_USE_PACKED_TVAL */
+
+/* Byteswap an (aligned) duk_double_union. */
+#if defined(DUK_USE_DOUBLE_LE)
+#define DUK_DBLUNION_BSWAP(u) do { \
+		duk_uint32_t duk__bswaptmp1, duk__bswaptmp2; \
+		duk__bswaptmp1 = (u)->ui[0]; \
+		duk__bswaptmp2 = (u)->ui[1]; \
+		duk__bswaptmp1 = DUK_BSWAP32(duk__bswaptmp1); \
+		duk__bswaptmp2 = DUK_BSWAP32(duk__bswaptmp2); \
+		(u)->ui[0] = duk__bswaptmp2; \
+		(u)->ui[1] = duk__bswaptmp1; \
+	} while (0)
+#elif defined(DUK_USE_DOUBLE_ME)
+#define DUK_DBLUNION_BSWAP(u) do { \
+		duk_uint32_t duk__bswaptmp1, duk__bswaptmp2; \
+		duk__bswaptmp1 = (u)->ui[0]; \
+		duk__bswaptmp2 = (u)->ui[1]; \
+		duk__bswaptmp1 = DUK_BSWAP32(duk__bswaptmp1); \
+		duk__bswaptmp2 = DUK_BSWAP32(duk__bswaptmp2); \
+		(u)->ui[0] = duk__bswaptmp1; \
+		(u)->ui[1] = duk__bswaptmp2; \
+	} while (0)
+#elif defined(DUK_USE_DOUBLE_BE)
+#define DUK_DBLUNION_BSWAP(u) do { } while (0)
+#else
+#error internal error, double endianness insane
+#endif
 
 #endif  /* DUK_DBLUNION_H_INCLUDED */

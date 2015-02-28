@@ -3,10 +3,10 @@ title: runtests prologue should not break a "use strict" in the test case
 desc: ""
 type: :bugfix
 component: duk
-release: v0.12
+release: v1.1
 reporter: sva <sami.vaarala@iki.fi>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2014-01-17 23:33:27.554424 Z
 references: []
 
@@ -27,4 +27,20 @@ log_events:
 - - 2014-07-10 12:43:16.891178 Z
   - Sami Vaarala <sami.vaarala@iki.fi>
   - assigned to release v0.12 from v0.11
+  - ""
+- - 2014-09-09 11:33:52.631336 Z
+  - Sami Vaarala <sami.vaarala@iki.fi>
+  - assigned to release v1.1 from v0.12
+  - ""
+- - 2014-12-22 16:20:05.607021 Z
+  - Sami Vaarala <sami.vaarala@iki.fi>
+  - assigned to release v1.2 from v1.1
+  - ""
+- - 2015-01-03 14:54:11.443494 Z
+  - Sami Vaarala <sami.vaarala@iki.fi>
+  - assigned to release v1.1 from v1.2
+  - ""
+- - 2015-01-04 00:03:31.141935 Z
+  - Sami Vaarala <sami.vaarala@iki.fi>
+  - closed with disposition fixed
   - ""

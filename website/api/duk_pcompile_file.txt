@@ -24,3 +24,8 @@ duk_pop(ctx);
 
 =tags
 compile
+nonportable
+protected
+
+=introduced
+1.0.0

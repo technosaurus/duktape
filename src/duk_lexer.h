@@ -357,7 +357,6 @@ struct duk_token {
 	duk_hstring *str2;            /* string 2 of token (borrowed, stored to ctx->slot1_idx) */
 	duk_size_t start_offset;      /* start byte offset of token in lexer input */
 	duk_int_t start_line;         /* start line of token (first char) */
-	duk_int_t end_line;           /* end line of token (char after last token char) */
 	duk_int_t num_escapes;        /* number of escapes and line continuations (for directive prologue) */
 	duk_bool_t lineterm;          /* token was preceded by a lineterm */
 	duk_bool_t allow_auto_semi;   /* token allows automatic semicolon insertion (eof or preceded by newline) */
@@ -405,17 +404,18 @@ struct duk_lexer_ctx {
  *  Prototypes
  */
 
-void duk_lexer_initctx(duk_lexer_ctx *lex_ctx);
+DUK_INTERNAL_DECL void duk_lexer_initctx(duk_lexer_ctx *lex_ctx);
 
-void duk_lexer_setpoint(duk_lexer_ctx *lex_ctx, duk_lexer_point *pt);
+DUK_INTERNAL_DECL void duk_lexer_setpoint(duk_lexer_ctx *lex_ctx, duk_lexer_point *pt);
 
+DUK_INTERNAL_DECL
 void duk_lexer_parse_js_input_element(duk_lexer_ctx *lex_ctx,
                                       duk_token *out_token,
                                       duk_bool_t strict_mode,
                                       duk_bool_t regexp_mode);
 #ifdef DUK_USE_REGEXP_SUPPORT
-void duk_lexer_parse_re_token(duk_lexer_ctx *lex_ctx, duk_re_token *out_token);
-void duk_lexer_parse_re_ranges(duk_lexer_ctx *lex_ctx, duk_re_range_callback gen_range, void *userdata);
+DUK_INTERNAL_DECL void duk_lexer_parse_re_token(duk_lexer_ctx *lex_ctx, duk_re_token *out_token);
+DUK_INTERNAL_DECL void duk_lexer_parse_re_ranges(duk_lexer_ctx *lex_ctx, duk_re_range_callback gen_range, void *userdata);
 #endif  /* DUK_USE_REGEXP_SUPPORT */
 
 #endif  /* DUK_LEXER_H_INCLUDED */

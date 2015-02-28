@@ -71,7 +71,7 @@ typedef struct {
  * larger than say 2G.
  */
 
-static duk_uint32_t duk__encode_i32(duk_int32_t x) {
+DUK_LOCAL duk_uint32_t duk__encode_i32(duk_int32_t x) {
 	if (x < 0) {
 		return ((duk_uint32_t) (-x)) * 2 + 1;
 	} else {
@@ -82,26 +82,26 @@ static duk_uint32_t duk__encode_i32(duk_int32_t x) {
 /* XXX: return type should probably be duk_size_t, or explicit checks are needed for
  * maximum size.
  */
-static duk_uint32_t duk__insert_u32(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_uint32_t x) {
+DUK_LOCAL duk_uint32_t duk__insert_u32(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_uint32_t x) {
 	return (duk_uint32_t) duk_hbuffer_insert_xutf8(re_ctx->thr, re_ctx->buf, offset, x);
 }
 
-static duk_uint32_t duk__append_u32(duk_re_compiler_ctx *re_ctx, duk_uint32_t x) {
+DUK_LOCAL duk_uint32_t duk__append_u32(duk_re_compiler_ctx *re_ctx, duk_uint32_t x) {
 	return (duk_uint32_t) duk_hbuffer_append_xutf8(re_ctx->thr, re_ctx->buf, x);
 }
 
-static duk_uint32_t duk__insert_i32(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_int32_t x) {
+DUK_LOCAL duk_uint32_t duk__insert_i32(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_int32_t x) {
 	return (duk_uint32_t) duk_hbuffer_insert_xutf8(re_ctx->thr, re_ctx->buf, offset, duk__encode_i32(x));
 }
 
 #if 0  /* unused */
-static duk_uint32_t duk__append_i32(duk_re_compiler_ctx *re_ctx, duk_int32_t x) {
+DUK_LOCAL duk_uint32_t duk__append_i32(duk_re_compiler_ctx *re_ctx, duk_int32_t x) {
 	return duk_hbuffer_append_xutf8(re_ctx->thr, re_ctx->buf, duk__encode_i32(x));
 }
 #endif
 
 /* special helper for emitting u16 lists (used for character ranges for built-in char classes) */
-static void duk__append_u16_list(duk_re_compiler_ctx *re_ctx, duk_uint16_t *values, duk_uint32_t count) {
+DUK_LOCAL void duk__append_u16_list(duk_re_compiler_ctx *re_ctx, duk_uint16_t *values, duk_uint32_t count) {
 	/* Call sites don't need the result length so it's not accumulated. */
 	while (count > 0) {
 		(void) duk__append_u32(re_ctx, (duk_uint32_t) (*values++));
@@ -109,15 +109,15 @@ static void duk__append_u16_list(duk_re_compiler_ctx *re_ctx, duk_uint16_t *valu
 	}
 }
 
-static void duk__insert_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_uint32_t data_offset, duk_uint32_t data_length) {
+DUK_LOCAL void duk__insert_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_uint32_t data_offset, duk_uint32_t data_length) {
 	duk_hbuffer_insert_slice(re_ctx->thr, re_ctx->buf, offset, data_offset, (duk_size_t) data_length);
 }
 
-static void duk__append_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t data_offset, duk_uint32_t data_length) {
+DUK_LOCAL void duk__append_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t data_offset, duk_uint32_t data_length) {
 	duk_hbuffer_append_slice(re_ctx->thr, re_ctx->buf, data_offset, (duk_size_t) data_length);
 }
 
-static void duk__remove_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_uint32_t length) {
+DUK_LOCAL void duk__remove_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_uint32_t length) {
 	duk_hbuffer_remove_slice(re_ctx->thr, re_ctx->buf, offset, (duk_size_t) length);
 }
 
@@ -134,7 +134,7 @@ static void duk__remove_slice(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, 
  *  first byte of the next instruction, is a bit tricky because of the
  *  variable length UTF-8 encoding.  See doc/regexp.txt for discussion.
  */
-static duk_uint32_t duk__insert_jump_offset(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_int32_t skip) {
+DUK_LOCAL duk_uint32_t duk__insert_jump_offset(duk_re_compiler_ctx *re_ctx, duk_uint32_t offset, duk_int32_t skip) {
 	duk_small_int_t len;
 
 	/* XXX: solve into closed form (smaller code) */
@@ -149,7 +149,7 @@ static duk_uint32_t duk__insert_jump_offset(duk_re_compiler_ctx *re_ctx, duk_uin
 	return duk__insert_i32(re_ctx, offset, skip);
 }
 
-static duk_uint32_t duk__append_jump_offset(duk_re_compiler_ctx *re_ctx, duk_int32_t skip) {
+DUK_LOCAL duk_uint32_t duk__append_jump_offset(duk_re_compiler_ctx *re_ctx, duk_int32_t skip) {
 	return (duk_uint32_t) duk__insert_jump_offset(re_ctx, (duk_uint32_t) DUK__BUFLEN(re_ctx), skip);
 }
 
@@ -172,7 +172,7 @@ static duk_uint32_t duk__append_jump_offset(duk_re_compiler_ctx *re_ctx, duk_int
  *  being parsed simultaneously).
  */
 
-static void duk__generate_ranges(void *userdata, duk_codepoint_t r1, duk_codepoint_t r2, duk_bool_t direct) {
+DUK_LOCAL void duk__generate_ranges(void *userdata, duk_codepoint_t r1, duk_codepoint_t r2, duk_bool_t direct) {
 	duk_re_compiler_ctx *re_ctx = (duk_re_compiler_ctx *) userdata;
 
 	DUK_DD(DUK_DDPRINT("duk__generate_ranges(): re_ctx=%p, range=[%ld,%ld] direct=%ld",
@@ -273,7 +273,7 @@ static void duk__generate_ranges(void *userdata, duk_codepoint_t r1, duk_codepoi
  *      as complex though.
  */
 
-static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expect_eof, duk__re_disjunction_info *out_atom_info) {
+DUK_LOCAL void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expect_eof, duk__re_disjunction_info *out_atom_info) {
 	duk_int32_t atom_start_offset = -1;                   /* negative -> no atom matched on previous round */
 	duk_int32_t atom_char_length = 0;                     /* negative -> complex atom */
 	duk_uint32_t atom_start_captures = re_ctx->captures;  /* value of re_ctx->captures at start of atom */
@@ -286,8 +286,8 @@ static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expec
 	DUK_ASSERT(out_atom_info != NULL);
 
 	if (re_ctx->recursion_depth >= re_ctx->recursion_limit) {
-		DUK_ERROR(re_ctx->thr, DUK_ERR_INTERNAL_ERROR,
-		          "regexp compiler recursion limit reached");
+		DUK_ERROR(re_ctx->thr, DUK_ERR_RANGE_ERROR,
+		          DUK_STR_REGEXP_COMPILER_RECURSION_LIMIT);
 	}
 	re_ctx->recursion_depth++;
 
@@ -361,18 +361,18 @@ static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expec
 		case DUK_RETOK_QUANTIFIER: {
 			if (atom_start_offset < 0) {
 				DUK_ERROR(re_ctx->thr, DUK_ERR_SYNTAX_ERROR,
-				          "quantifier without preceding atom");
+				          DUK_STR_INVALID_QUANTIFIER_NO_ATOM);
 			}
 			if (re_ctx->curr_token.qmin > re_ctx->curr_token.qmax) {
 				DUK_ERROR(re_ctx->thr, DUK_ERR_SYNTAX_ERROR,
-				          "quantifier values invalid (qmin > qmax)");
+				          DUK_STR_INVALID_QUANTIFIER_VALUES);
 			}
 			if (atom_char_length >= 0) {
 				/*
 				 *  Simple atom
 				 *
 				 *  If atom_char_length is zero, we'll have unbounded execution time for e.g.
-			 	 *  /()*x/.exec('x').  We can't just skip the match because it might have some
+				 *  /()*x/.exec('x').  We can't just skip the match because it might have some
 				 *  side effects (for instance, if we allowed captures in simple atoms, the
 				 *  capture needs to happen).  The simple solution below is to force the
 				 *  quantifier to match at most once, since the additional matches have no effect.
@@ -433,8 +433,8 @@ static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expec
 				atom_copies = (re_ctx->curr_token.qmax == DUK_RE_QUANTIFIER_INFINITE) ?
 				              re_ctx->curr_token.qmin : re_ctx->curr_token.qmax;
 				if (atom_copies > DUK_RE_MAX_ATOM_COPIES) {
-					DUK_ERROR(re_ctx->thr, DUK_ERR_INTERNAL_ERROR,
-					          "quantifier expansion requires too many atom copies");
+					DUK_ERROR(re_ctx->thr, DUK_ERR_RANGE_ERROR,
+					          DUK_STR_QUANTIFIER_TOO_MANY_COPIES);
 				}
 
 				/* wipe the capture range made by the atom (if any) */
@@ -498,7 +498,7 @@ static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expec
 					 *      SPLIT1 LSEQ
 					 *      (atom)
 					 *      SPLIT1 LSEQ    ; <- the byte length of this instruction is needed
-					 *      (atom)	       ; to encode the above SPLIT1 correctly
+					 *      (atom)         ; to encode the above SPLIT1 correctly
 					 *      ...
 					 *   LSEQ:
 					 */
@@ -697,20 +697,20 @@ static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expec
 		case DUK_RETOK_ATOM_END_GROUP: {
 			if (expect_eof) {
 				DUK_ERROR(re_ctx->thr, DUK_ERR_SYNTAX_ERROR,
-				          "unexpected closing parenthesis");
+				          DUK_STR_UNEXPECTED_CLOSING_PAREN);
 			}
 			goto done;
 		}
 		case DUK_RETOK_EOF: {
 			if (!expect_eof) {
 				DUK_ERROR(re_ctx->thr, DUK_ERR_SYNTAX_ERROR,
-				          "unexpected end of pattern");
+				          DUK_STR_UNEXPECTED_END_OF_PATTERN);
 			}
 			goto done;
 		}
 		default: {
 			DUK_ERROR(re_ctx->thr, DUK_ERR_SYNTAX_ERROR,
-			          "unexpected token in regexp");
+			          DUK_STR_UNEXPECTED_REGEXP_TOKEN);
 		}
 		}
 
@@ -761,9 +761,9 @@ static void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t expec
  *  Flags parsing (see E5 Section 15.10.4.1).
  */
 
-static duk_uint32_t duk__parse_regexp_flags(duk_hthread *thr, duk_hstring *h) {
-	duk_uint8_t *p;
-	duk_uint8_t *p_end;
+DUK_LOCAL duk_uint32_t duk__parse_regexp_flags(duk_hthread *thr, duk_hstring *h) {
+	const duk_uint8_t *p;
+	const duk_uint8_t *p_end;
 	duk_uint32_t flags = 0;
 
 	p = DUK_HSTRING_GET_DATA(h);
@@ -804,7 +804,7 @@ static duk_uint32_t duk__parse_regexp_flags(duk_hthread *thr, duk_hstring *h) {
 	return flags;
 
  error:
-	DUK_ERROR(thr, DUK_ERR_SYNTAX_ERROR, "invalid regexp flags");
+	DUK_ERROR(thr, DUK_ERR_SYNTAX_ERROR, DUK_STR_INVALID_REGEXP_FLAGS);
 	return 0;  /* never here */
 }
 
@@ -828,7 +828,7 @@ static duk_uint32_t duk__parse_regexp_flags(duk_hthread *thr, duk_hstring *h) {
  *  passed through without change.
  */
 
-static void duk__create_escaped_source(duk_hthread *thr, int idx_pattern) {
+DUK_LOCAL void duk__create_escaped_source(duk_hthread *thr, int idx_pattern) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_hstring *h;
 	duk_hbuffer_dynamic *buf;
@@ -885,7 +885,7 @@ static void duk__create_escaped_source(duk_hthread *thr, int idx_pattern) {
  *  Output stack: [ bytecode escaped_source ]  (both as strings)
  */
 
-void duk_regexp_compile(duk_hthread *thr) {
+DUK_INTERNAL void duk_regexp_compile(duk_hthread *thr) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_re_compiler_ctx re_ctx;
 	duk_lexer_point lex_point;
@@ -943,7 +943,7 @@ void duk_regexp_compile(duk_hthread *thr) {
 	 *  Init lexer
 	 */
 
-	lex_point.offset = 0;		/* expensive init, just want to fill window */
+	lex_point.offset = 0;  /* expensive init, just want to fill window */
 	lex_point.line = 1;
 	DUK_LEXER_SETPOINT(&re_ctx.lex, &lex_point);
 
@@ -973,7 +973,7 @@ void duk_regexp_compile(duk_hthread *thr) {
 	 */
 
 	if (re_ctx.highest_backref > re_ctx.captures) {
-		DUK_ERROR(thr, DUK_ERR_SYNTAX_ERROR, "invalid backreference(s)");
+		DUK_ERROR(thr, DUK_ERR_SYNTAX_ERROR, DUK_STR_INVALID_BACKREFS);
 	}
 
 	/*
@@ -1014,8 +1014,8 @@ void duk_regexp_compile(duk_hthread *thr) {
  *  Input stack:  [ escaped_source bytecode ]  (both as strings)
  *  Output stack: [ RegExp ]
  */
- 
-void duk_regexp_create_instance(duk_hthread *thr) {
+
+DUK_INTERNAL void duk_regexp_create_instance(duk_hthread *thr) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_hobject *h;
 	duk_hstring *h_bc;
@@ -1042,25 +1042,25 @@ void duk_regexp_create_instance(duk_hthread *thr) {
 	DUK_HOBJECT_SET_CLASS_NUMBER(h, DUK_HOBJECT_CLASS_REGEXP);
 	DUK_HOBJECT_SET_PROTOTYPE_UPDREF(thr, h, thr->builtins[DUK_BIDX_REGEXP_PROTOTYPE]);
 
-	duk_def_prop_stridx(ctx, -3, DUK_STRIDX_INT_BYTECODE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -3, DUK_STRIDX_INT_BYTECODE, DUK_PROPDESC_FLAGS_NONE);
 
 	/* [ ... regexp_object escaped_source ] */
 
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_SOURCE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_SOURCE, DUK_PROPDESC_FLAGS_NONE);
 
 	/* [ ... regexp_object ] */
 
 	duk_push_boolean(ctx, (re_flags & DUK_RE_FLAG_GLOBAL));
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_GLOBAL, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_GLOBAL, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_boolean(ctx, (re_flags & DUK_RE_FLAG_IGNORE_CASE));
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_IGNORE_CASE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_IGNORE_CASE, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_boolean(ctx, (re_flags & DUK_RE_FLAG_MULTILINE));
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_MULTILINE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_MULTILINE, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_int(ctx, 0);
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LAST_INDEX, DUK_PROPDESC_FLAGS_W);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_LAST_INDEX, DUK_PROPDESC_FLAGS_W);
 
 	/* [ ... regexp_object ] */
 }
@@ -1072,4 +1072,3 @@ void duk_regexp_create_instance(duk_hthread *thr) {
 /* regexp support disabled */
 
 #endif  /* DUK_USE_REGEXP_SUPPORT */
-

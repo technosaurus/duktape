@@ -27,6 +27,5 @@ duk_pop(ctx);  /* pop array */
 stack
 object
 
-=fixme
-There is no way to give an initial size for array.
-This would be useful to minimize memory allocations.
+=introduced
+1.0.0

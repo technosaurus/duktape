@@ -8,7 +8,7 @@
  *  Constructor
  */
 
-duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 	duk_size_t buf_size;
 	duk_small_int_t buf_dynamic;
 	duk_uint8_t *buf_data;
@@ -21,6 +21,8 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 	 *
 	 *    http://nodejs.org/api/buffer.html
 	 *
+	 *  Note that the ToBuffer() coercion (duk_to_buffer()) does NOT match
+	 *  the constructor behavior.
 	 */
 
 	buf_dynamic = duk_get_boolean(ctx, 1);  /* default to false */
@@ -73,7 +75,7 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 
 		/* Buffer object internal value is immutable */
 		duk_dup(ctx, -2);
-		duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
+		duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
 	}
 	/* Note: unbalanced stack on purpose */
 
@@ -84,9 +86,9 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
  *  toString(), valueOf()
  */
 
-duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
 	duk_tval *tv;
-	duk_small_int_t to_string = duk_get_magic(ctx);
+	duk_small_int_t to_string = duk_get_current_magic(ctx);
 
 	duk_push_this(ctx);
 	tv = duk_require_tval(ctx, -1);

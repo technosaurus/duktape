@@ -29,5 +29,5 @@ duk_trim(ctx, -3);
 stack
 string
 
-=fixme
-Return const char *?
+=introduced
+1.0.0

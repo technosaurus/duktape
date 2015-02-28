@@ -17,3 +17,7 @@ duk_compile_file(ctx, 0, "test.js");
 
 =tags
 compile
+nonportable
+
+=introduced
+1.0.0

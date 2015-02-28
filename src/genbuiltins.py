@@ -130,27 +130,6 @@ PROPDESC_FLAG_ENUMERABLE =   (1 << 1)
 PROPDESC_FLAG_CONFIGURABLE = (1 << 2)
 PROPDESC_FLAG_ACCESSOR =     (1 << 3)  # unused now
 
-# magic values for Date built-in, must match duk_bi_date.c
-BI_DATE_FLAG_NAN_TO_ZERO =        (1 << 0)
-BI_DATE_FLAG_NAN_TO_RANGE_ERROR = (1 << 1)
-BI_DATE_FLAG_ONEBASED =           (1 << 2)
-BI_DATE_FLAG_LOCALTIME =          (1 << 3)
-BI_DATE_FLAG_SUB1900 =            (1 << 4)
-BI_DATE_FLAG_TOSTRING_DATE =      (1 << 5)
-BI_DATE_FLAG_TOSTRING_TIME =      (1 << 6)
-BI_DATE_FLAG_TOSTRING_LOCALE =    (1 << 7)
-BI_DATE_FLAG_TIMESETTER =         (1 << 8)
-BI_DATE_FLAG_YEAR_FIXUP =         (1 << 9)
-BI_DATE_FLAG_SEP_T =              (1 << 10)
-BI_DATE_IDX_YEAR =           0
-BI_DATE_IDX_MONTH =          1
-BI_DATE_IDX_DAY =            2
-BI_DATE_IDX_HOUR =           3
-BI_DATE_IDX_MINUTE =         4
-BI_DATE_IDX_SECOND =         5
-BI_DATE_IDX_MILLISECOND =    6
-BI_DATE_IDX_WEEKDAY =        7
-
 # magic values for Array built-in
 BI_ARRAY_ITER_EVERY =    0
 BI_ARRAY_ITER_SOME =     1
@@ -285,8 +264,8 @@ bi_global = {
 		#   print:  common even outside browsers (smjs: length = 0)
 		#   alert:  common in browsers (Chromium: length = 0)
 
-		{ 'name': 'print',			'native': 'duk_bi_global_object_print',			'length': 0,	'varargs': True,	'browser': True },
-		{ 'name': 'alert',			'native': 'duk_bi_global_object_alert',			'length': 0,	'varargs': True,	'browser': True },
+		{ 'name': 'print',			'native': 'duk_bi_global_object_print_helper',		'length': 0,	'varargs': True,	'browser': True,	'magic': { 'type': 'plain', 'value': 0 } },
+		{ 'name': 'alert',			'native': 'duk_bi_global_object_print_helper',		'length': 0,	'varargs': True,	'browser': True,	'magic': { 'type': 'plain', 'value': 1 } },
 
 		# CommonJS module loading
 		#
@@ -300,7 +279,7 @@ bi_global_env = {
 	'class': 'ObjEnv',
 
 	'values': [
-		{ 'name': internal('target'),		'value': { 'type': 'builtin', 'id': 'bi_global' },	'attributes': '' },
+		{ 'name': internal('Target'),		'value': { 'type': 'builtin', 'id': 'bi_global' },	'attributes': '' },
 	],
 	'functions': [],
 }
@@ -383,14 +362,22 @@ bi_function_prototype = {
 	'internal_prototype': 'bi_object_prototype',
 	'external_constructor': 'bi_function_constructor',
 	'class': 'Function',
-	'name': '',
+	'name': '',  # dummy
 
 	'length': 0,
 	'native': 'duk_bi_function_prototype',
 	'callable': True,
 	'constructable': False,  # Note: differs from other global Function classed objects (matches e.g. V8 behavior).
 
-	'values': [],
+	'values': [
+		# Each built-in of class Function has a 'name' which is
+		# non-writable (the empty string above).  Function.prototype
+		# is a special case: it is a function but we want it's name
+		# to be writable so that user code can set a 'name' property
+		# for Duktape/C functions.  If the Function.prototype.name
+		# property were non-writable, that would be prevented.
+		{ 'name': 'name',			'value': '',			'attributes': 'w' }
+	],
 	'functions': [
 		# test262 ch15/15.3/15.3.4/15.3.4.2/S15.3.4.2_A11 checks that Function.prototype.toString.length
 		# is zero, cannot find specification support for that but 0 is a good value.
@@ -496,7 +483,7 @@ bi_string_prototype = {
 		# which prevents a String instance's internal value also from being
 		# written with standard methods.  The internal code creating String
 		# instances has no such issues.
-		{ 'name': internal('value'),            'value': '',	'attributes': '' },
+		{ 'name': internal('Value'),            'value': '',	'attributes': '' },
 	],
 	'functions': [
 		{ 'name': 'toString',			'native': 'duk_bi_string_prototype_to_string',		'length': 0 },
@@ -550,7 +537,7 @@ bi_boolean_prototype = {
 		# which prevents a Boolean instance's internal value also from being
 		# written with standard methods.  The internal code creating Boolean
 		# instances has no such issues.
-		{ 'name': internal('value'),            'value': False,		'attributes': '' },
+		{ 'name': internal('Value'),            'value': False,		'attributes': '' },
 	],
 	'functions': [
 		{ 'name': 'toString',			'native': 'duk_bi_boolean_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 1 } },  # magic = coerce_tostring
@@ -590,7 +577,7 @@ bi_number_prototype = {
 		# which prevents a Number instance's internal value also from being
 		# written with standard methods.  The internal code creating Number
 		# instances has no such issues.
-		{ 'name': internal('value'),            'value': 0.0,		'attributes': '' }
+		{ 'name': internal('Value'),            'value': 0.0,		'attributes': '' }
 	],
 	'functions': [
 		{ 'name': 'toString',			'native': 'duk_bi_number_prototype_to_string',		'length': 1 },
@@ -653,60 +640,67 @@ bi_date_prototype = {
 		#  > Date.prototype.toString()
 		#  'Fri Jan 01 2010 00:00:00 GMT+0200 (EET)'
 
-		{ 'name': internal('value'),            'value': DBL_NAN,	'attributes': 'w' }
+		{ 'name': internal('Value'),            'value': DBL_NAN,	'attributes': 'w' }
 	],
+
+	# NOTE: The magic values for Date prototype are special.  The actual control
+	# flags needed for the built-ins don't fit into LIGHTFUNC magic field, so
+	# the values here are indices to duk__date_magics[] in duk_bi_date.c which
+	# contains the actual control flags.  Magic values here must be kept in strict
+	# sync with duk_bi_date.c!
+
 	'functions': [
-		{ 'name': 'toString',			'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_DATE + BI_DATE_FLAG_TOSTRING_TIME + BI_DATE_FLAG_LOCALTIME } },
-		{ 'name': 'toDateString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_DATE + BI_DATE_FLAG_LOCALTIME } },
-		{ 'name': 'toTimeString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_TIME + BI_DATE_FLAG_LOCALTIME } },
-		{ 'name': 'toLocaleString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_DATE + BI_DATE_FLAG_TOSTRING_TIME + BI_DATE_FLAG_TOSTRING_LOCALE + BI_DATE_FLAG_LOCALTIME } },
-		{ 'name': 'toLocaleDateString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_DATE + BI_DATE_FLAG_TOSTRING_LOCALE + BI_DATE_FLAG_LOCALTIME } },
-		{ 'name': 'toLocaleTimeString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_TIME + BI_DATE_FLAG_TOSTRING_LOCALE + BI_DATE_FLAG_LOCALTIME } },
-		{ 'name': 'toUTCString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_DATE + BI_DATE_FLAG_TOSTRING_TIME } },
-		{ 'name': 'toISOString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TOSTRING_DATE + BI_DATE_FLAG_TOSTRING_TIME + BI_DATE_FLAG_NAN_TO_RANGE_ERROR + BI_DATE_FLAG_SEP_T } },
+		{ 'name': 'toString',			'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 0 } },
+		{ 'name': 'toDateString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 1 } },
+		{ 'name': 'toTimeString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 2 } },
+		{ 'name': 'toLocaleString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 3 } },
+		{ 'name': 'toLocaleDateString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 4 } },
+		{ 'name': 'toLocaleTimeString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 5 } },
+		{ 'name': 'toUTCString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 6 } },
+		{ 'name': 'toISOString',		'native': 'duk_bi_date_prototype_tostring_shared',	'length': 0,	'magic': { 'type': 'plain', 'value': 7 } },
 		{ 'name': 'toJSON',			'native': 'duk_bi_date_prototype_to_json',		'length': 1 },
 		{ 'name': 'valueOf',			'native': 'duk_bi_date_prototype_value_of',		'length': 0 },
 		{ 'name': 'getTime',			'native': 'duk_bi_date_prototype_value_of',		'length': 0 },  # Native function shared on purpose
-		{ 'name': 'getFullYear',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_YEAR << 12) } },
-		{ 'name': 'getUTCFullYear',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_YEAR << 12) } },
-		{ 'name': 'getMonth',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_MONTH << 12) } },
-		{ 'name': 'getUTCMonth',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_MONTH << 12) } },
-		{ 'name': 'getDate',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_ONEBASED + BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_DAY << 12) } },
-		{ 'name': 'getUTCDate',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_ONEBASED + (BI_DATE_IDX_DAY << 12) } },
-		{ 'name': 'getDay',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_WEEKDAY << 12) } },
-		{ 'name': 'getUTCDay',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_WEEKDAY << 12) } },
-		{ 'name': 'getHours',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_HOUR << 12) } },
-		{ 'name': 'getUTCHours',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_HOUR << 12) } },
-		{ 'name': 'getMinutes',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_MINUTE << 12) } },
-		{ 'name': 'getUTCMinutes',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_MINUTE << 12) } },
-		{ 'name': 'getSeconds',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_SECOND << 12) } },
-		{ 'name': 'getUTCSeconds',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_SECOND << 12) } },
-		{ 'name': 'getMilliseconds',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (BI_DATE_IDX_MILLISECOND << 12) } },
-		{ 'name': 'getUTCMilliseconds',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 0 + (BI_DATE_IDX_MILLISECOND << 12) } },
+		{ 'name': 'getFullYear',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 8 } },
+		{ 'name': 'getUTCFullYear',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 9 } },
+		{ 'name': 'getMonth',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 10 } },
+		{ 'name': 'getUTCMonth',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 11 } },
+		{ 'name': 'getDate',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 12 } },
+		{ 'name': 'getUTCDate',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 13 } },
+		{ 'name': 'getDay',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 14 } },
+		{ 'name': 'getUTCDay',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 15 } },
+		{ 'name': 'getHours',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 16 } },
+		{ 'name': 'getUTCHours',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 17 } },
+		{ 'name': 'getMinutes',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 18 } },
+		{ 'name': 'getUTCMinutes',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 19 } },
+		{ 'name': 'getSeconds',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 20 } },
+		{ 'name': 'getUTCSeconds',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 21 } },
+		{ 'name': 'getMilliseconds',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 22 } },
+		{ 'name': 'getUTCMilliseconds',		'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'magic': { 'type': 'plain', 'value': 23 } },
 		{ 'name': 'getTimezoneOffset',		'native': 'duk_bi_date_prototype_get_timezone_offset',	'length': 0 },
 		{ 'name': 'setTime',			'native': 'duk_bi_date_prototype_set_time',		'length': 1 },
-		{ 'name': 'setMilliseconds',		'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + BI_DATE_FLAG_LOCALTIME + (1 << 12) } },
-		{ 'name': 'setUTCMilliseconds',		'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + (1 << 12) } },
-		{ 'name': 'setSeconds',			'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True, 	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + BI_DATE_FLAG_LOCALTIME + (2 << 12) } },
-		{ 'name': 'setUTCSeconds',		'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + (2 << 12) } },
-		{ 'name': 'setMinutes',			'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + BI_DATE_FLAG_LOCALTIME + (3 << 12) } },
-		{ 'name': 'setUTCMinutes',		'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + (3 << 12) } },
-		{ 'name': 'setHours',			'native': 'duk_bi_date_prototype_set_shared',		'length': 4,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + BI_DATE_FLAG_LOCALTIME + (4 << 12) } },
-		{ 'name': 'setUTCHours',		'native': 'duk_bi_date_prototype_set_shared',		'length': 4,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_TIMESETTER + (4 << 12) } },
-		{ 'name': 'setDate',			'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (1 << 12) } },
-		{ 'name': 'setUTCDate',			'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': 0 + (1 << 12) } },
-		{ 'name': 'setMonth',			'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + (2 << 12) } },
-		{ 'name': 'setUTCMonth',		'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True,	'magic': { 'type': 'plain', 'value': 0 + (2 << 12) } },
-		{ 'name': 'setFullYear',		'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_NAN_TO_ZERO + BI_DATE_FLAG_LOCALTIME + (3 << 12) } },
-		{ 'name': 'setUTCFullYear',		'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_NAN_TO_ZERO + (3 << 12) } },
+		{ 'name': 'setMilliseconds',		'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': 24 } },
+		{ 'name': 'setUTCMilliseconds',		'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': 25 } },
+		{ 'name': 'setSeconds',			'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True, 	'magic': { 'type': 'plain', 'value': 26 } },
+		{ 'name': 'setUTCSeconds',		'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True,	'magic': { 'type': 'plain', 'value': 27 } },
+		{ 'name': 'setMinutes',			'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': 28 } },
+		{ 'name': 'setUTCMinutes',		'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': 29 } },
+		{ 'name': 'setHours',			'native': 'duk_bi_date_prototype_set_shared',		'length': 4,	'varargs': True,	'magic': { 'type': 'plain', 'value': 30 } },
+		{ 'name': 'setUTCHours',		'native': 'duk_bi_date_prototype_set_shared',		'length': 4,	'varargs': True,	'magic': { 'type': 'plain', 'value': 31 } },
+		{ 'name': 'setDate',			'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': 32 } },
+		{ 'name': 'setUTCDate',			'native': 'duk_bi_date_prototype_set_shared',		'length': 1,				'magic': { 'type': 'plain', 'value': 33 } },
+		{ 'name': 'setMonth',			'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True,	'magic': { 'type': 'plain', 'value': 34 } },
+		{ 'name': 'setUTCMonth',		'native': 'duk_bi_date_prototype_set_shared',		'length': 2,	'varargs': True,	'magic': { 'type': 'plain', 'value': 35 } },
+		{ 'name': 'setFullYear',		'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': 36 } },
+		{ 'name': 'setUTCFullYear',		'native': 'duk_bi_date_prototype_set_shared',		'length': 3,	'varargs': True,	'magic': { 'type': 'plain', 'value': 37 } },
 
 		# Non-standard extensions: E5 Section B.2.4, B.2.5, B.2.6
 		#
 		# 'length' values are not given explicitly but follows the general rule.
 		# The lengths below agree with V8.
 
-		{ 'name': 'getYear',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'section_b': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_LOCALTIME + BI_DATE_FLAG_SUB1900 + (BI_DATE_IDX_YEAR << 12) } },
-		{ 'name': 'setYear',			'native': 'duk_bi_date_prototype_set_shared',		'length': 1,	'section_b': True,	'magic': { 'type': 'plain', 'value': BI_DATE_FLAG_NAN_TO_ZERO + BI_DATE_FLAG_YEAR_FIXUP + (3 << 12) } },
+		{ 'name': 'getYear',			'native': 'duk_bi_date_prototype_get_shared',		'length': 0,	'section_b': True,	'magic': { 'type': 'plain', 'value': 38 } },
+		{ 'name': 'setYear',			'native': 'duk_bi_date_prototype_set_shared',		'length': 1,	'section_b': True,	'magic': { 'type': 'plain', 'value': 39 } },
 
 		# Note: toGMTString() is required to initially be the same Function object as the initial
 		# Date.prototype.toUTCString.  In other words: Date.prototype.toGMTString === Date.prototype.toUTCString --> true.
@@ -749,7 +743,7 @@ bi_regexp_prototype = {
 
 		{
 			# Compiled bytecode, must match duk_regexp.h.
-			'name': internal('bytecode'),
+			'name': internal('Bytecode'),
 			'value': unichr(0) +		# flags (none)
 			         unichr(2) +		# nsaved == 2
 			         unichr(1),		# DUK_REOP_MATCH
@@ -1441,7 +1435,7 @@ class GenBuiltins:
 
 	def writeNativeFuncArray(self, genc):
 		genc.emitLine('/* native functions: %d */' % len(self.native_func_list))
-		genc.emitLine('const duk_c_function duk_bi_native_functions[] = {')
+		genc.emitLine('DUK_INTERNAL const duk_c_function duk_bi_native_functions[%d] = {' % len(self.native_func_list))
 		for i in self.native_func_list:
 			# The function pointer cast here makes BCC complain about
 			# "initializer too complicated", so omit the cast.
@@ -1769,20 +1763,22 @@ class GenBuiltins:
 		genc.emitLine('')
 		self.writeNativeFuncArray(genc)
 		genc.emitLine('')
-		genc.emitArray(self.init_data, 'duk_builtins_data', typename='duk_uint8_t', intvalues=True, const=True)
+		genc.emitArray(self.init_data, 'duk_builtins_data', visibility='DUK_INTERNAL', typename='duk_uint8_t', intvalues=True, const=True, size=len(self.init_data))
 		genc.emitLine('#ifdef DUK_USE_BUILTIN_INITJS')
-		genc.emitArray(self.initjs_data, 'duk_initjs_data', typename='duk_uint8_t', intvalues=True, const=True)
+		genc.emitArray(self.initjs_data, 'duk_initjs_data', visibility='DUK_INTERNAL', typename='duk_uint8_t', intvalues=True, const=True, size=len(self.initjs_data))
 		genc.emitLine('#endif  /* DUK_USE_BUILTIN_INITJS */')
 
 	def emitHeader(self, genc):
 		self.gs.emitStringsHeader(genc)
 
 		genc.emitLine('')
-		genc.emitLine('extern const duk_c_function duk_bi_native_functions[];')
-		genc.emitLine('extern const duk_uint8_t duk_builtins_data[];')
+		genc.emitLine('#if !defined(DUK_SINGLE_FILE)')
+		genc.emitLine('DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[%s];' % len(self.native_func_list))
+		genc.emitLine('DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[%d];' % len(self.init_data))
 		genc.emitLine('#ifdef DUK_USE_BUILTIN_INITJS')
-		genc.emitLine('extern const duk_uint8_t duk_initjs_data[];')
+		genc.emitLine('DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[%s];' % len(self.initjs_data))
 		genc.emitLine('#endif  /* DUK_USE_BUILTIN_INITJS */')
+		genc.emitLine('#endif  /* !DUK_SINGLE_FILE */')
 		genc.emitLine('')
 		genc.emitDefine('DUK_BUILTINS_DATA_LENGTH', len(self.init_data))
 		genc.emitLine('#ifdef DUK_USE_BUILTIN_INITJS')
@@ -1806,6 +1802,7 @@ if __name__ == '__main__':
 	parser.add_option('--initjs-data', dest='initjs_data')
 	parser.add_option('--out-header', dest='out_header')
 	parser.add_option('--out-source', dest='out_source')
+	parser.add_option('--out-metadata-json', dest='out_metadata_json')
 	(opts, args) = parser.parse_args()
 
 	f = open(opts.buildinfo, 'rb')
@@ -1864,3 +1861,18 @@ if __name__ == '__main__':
 	f.write(genc.getString())
 	f.close()
 
+	# write a JSON file with build metadata, which is useful e.g.
+	# if application needs to know the built-in strings beforehand
+	# for external strings low memory optimization
+	meta = {}
+	ver = long(build_info['version'])
+	meta['comment'] = 'Metadata for Duktape build'
+	meta['duk_version'] = ver
+	meta['duk_version_string'] = '%d.%d.%d' % (ver / 10000, (ver / 100) % 100, ver % 100)
+	meta['git_describe'] = build_info['git_describe']
+	strs, strs_base64 = gb_little.gs.getStringList()  # endianness doesn't matter
+	meta['builtin_strings'] = strs
+	meta['builtin_strings_base64'] = strs_base64
+	f = open(opts.out_metadata_json, 'wb')
+	f.write(json.dumps(meta, indent=4, sort_keys=True, ensure_ascii=True))
+	f.close()

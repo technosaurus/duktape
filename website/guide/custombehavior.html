@@ -6,8 +6,8 @@ specification.</p>
 <h2>Duktape built-in and custom types</h2>
 
 <p>The <code>Duktape</code> built-in is (of course) non-standard and provides
-access to Duktape specific features.  Also the buffer and pointer types are
-custom.</p>
+access to Duktape specific features.  Also the buffer, pointer, and lightfunc
+types are custom.</p>
 
 <h2>Internal properties</h2>
 
@@ -110,6 +110,24 @@ the splice operation to the end of the array.</p>
 Duktape uses this behavior by default.  The strict standards compliant behavior can
 be enabled with the feature option <code>DUK_OPT_NO_NONSTD_ARRAY_SPLICE_DELCOUNT</code>.</p>
 
+<h2>Array.prototype.concat() trailing non-existent elements</h2>
+
+<p>When the result of an array <code>concat()</code> would have trailing non-existent
+elements, the standard behavior is to ignore them so that they are not reflected in
+the result <code>length</code>.  Real world behavior is to include them in the result
+value <code>length</code>.  See
+<a href="https://github.com/svaarala/duktape/blob/master/ecmascript-testcases/test-bi-array-proto-concat-nonstd-trailing.js">test-bi-array-proto-concat-nonstd-trailing.js</a>.</p>
+
+<p>The real world behavior seems consistent in other engines (V8, Rhino, Spidermonkey
+at least), so Duktape uses the real world behavior by default.  The strict standards compliant
+behavior can be enabled with the feature option <code>DUK_OPT_NO_NONSTD_ARRAY_CONCAT_TRAILER</code>.</p>
+
+<h2>Array.prototype.map() trailing non-existent elements</h2>
+
+<p>Similar issue as with <code>Array.prototype.concat()</code>, see
+<a href="https://github.com/svaarala/duktape/blob/master/ecmascript-testcases/test-bi-array-proto-map-nonstd-trailing.js">test-bi-array-proto-map-nonstd-trailing.js</a>.  The strict standards compliant behavior can be
+enabled with the feature option <code>DUK_OPT_NO_NONSTD_ARRAY_MAP_TRAILER</code>.</p>
+
 <h2>Setter/getter key argument</h2>
 
 <p>Ecmascript standard behavior is that setters and getters are not given
@@ -131,3 +149,20 @@ with the feature option <code>DUK_OPT_NO_NONSTD_ACCESSOR_KEY_ARGUMENT</code>.</p
 <h2>Proxy object (ES6 draft subset)</h2>
 
 <p>See <a href="#es6-proxy">Proxy object (subset)</a>.</p>
+
+<h2>JSON.stringify() escapes U+2028 and U+2029</h2>
+
+<p><code>JSON.stringify()</code> standard behavior is to output U+2028 and
+U+2029 without escaping.  This leads to counterintuitive behavior when the
+output is used in a web page or parsed with <code>eval()</code>: the U+2028
+and U+2029 characters are considered line terminators which leads to a syntax
+error (unterminated string).  Duktape escapes U+2028 and U+2029 by default
+to avoid this issue; you can turn on the compliant behavior with the feature
+option <code>DUK_OPT_NO_NONSTD_JSON_ESC_U2028_U2029</code>.</p>
+
+<h2>String.fromCharCode() accepts 32-bit codepoints</h2>
+
+<p><code>String.fromCharCode()</code> standard behavior is to use ToUInt16()
+coercion for codepoint values.  Duktape uses ToUint32() by default to better
+support non-BMP strings.  You can force the compliant behavior with the
+feature option <code>DUK_OPT_NO_NONSTD_STRING_FROMCHARCODE_32BIT</code>.</p>

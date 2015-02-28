@@ -24,6 +24,7 @@ duk_pop(ctx);
 
 =tags
 compile
+protected
 
 =seealso
 duk_compile
@@ -32,3 +33,6 @@ duk_pcompile_string_filename
 duk_pcompile_lstring
 duk_pcompile_lstring_filename
 duk_pcompile_file
+
+=introduced
+1.0.0

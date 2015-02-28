@@ -62,7 +62,7 @@
  *  ToBoolean()  (E5 Section 9.2)
  */
 
-duk_bool_t duk_js_toboolean(duk_tval *tv) {
+DUK_INTERNAL duk_bool_t duk_js_toboolean(duk_tval *tv) {
 	switch (DUK_TVAL_GET_TAG(tv)) {
 	case DUK_TAG_UNDEFINED:
 	case DUK_TAG_NULL:
@@ -72,7 +72,7 @@ duk_bool_t duk_js_toboolean(duk_tval *tv) {
 	case DUK_TAG_STRING: {
 		duk_hstring *h = DUK_TVAL_GET_STRING(tv);
 		DUK_ASSERT(h != NULL);
-		return (h->blen > 0 ? 1 : 0);
+		return (DUK_HSTRING_GET_BYTELEN(h) > 0 ? 1 : 0);
 	}
 	case DUK_TAG_OBJECT: {
 		return 1;
@@ -86,6 +86,9 @@ duk_bool_t duk_js_toboolean(duk_tval *tv) {
 	case DUK_TAG_POINTER: {
 		void *p = DUK_TVAL_GET_POINTER(tv);
 		return (p != NULL ? 1 : 0);
+	}
+	case DUK_TAG_LIGHTFUNC: {
+		return 1;
 	}
 	default: {
 		/* number */
@@ -128,10 +131,10 @@ duk_bool_t duk_js_toboolean(duk_tval *tv) {
  *
  *    - Unlike source code literals, ToNumber() coerces empty strings
  *      and strings with only whitespace to zero (not NaN).
- */	
+ */
 
 /* E5 Section 9.3.1 */
-static duk_double_t duk__tonumber_string_raw(duk_hthread *thr) {
+DUK_LOCAL duk_double_t duk__tonumber_string_raw(duk_hthread *thr) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_small_uint_t s2n_flags;
 	duk_double_t d;
@@ -158,7 +161,7 @@ static duk_double_t duk__tonumber_string_raw(duk_hthread *thr) {
 	return d;
 }
 
-duk_double_t duk_js_tonumber(duk_hthread *thr, duk_tval *tv) {
+DUK_INTERNAL duk_double_t duk_js_tonumber(duk_hthread *thr, duk_tval *tv) {
 	duk_context *ctx = (duk_hthread *) thr;
 
 	DUK_ASSERT(thr != NULL);
@@ -213,12 +216,13 @@ duk_double_t duk_js_tonumber(duk_hthread *thr, duk_tval *tv) {
 		return duk__tonumber_string_raw(thr);
 	}
 	case DUK_TAG_POINTER: {
-		/* Coerce like boolean.  This allows code to do something like:
-		 *
-		 *    if (ptr) { ... }
-		 */
+		/* Coerce like boolean */
 		void *p = DUK_TVAL_GET_POINTER(tv);
 		return (p != NULL ? 1.0 : 0.0);
+	}
+	case DUK_TAG_LIGHTFUNC: {
+		/* +(function(){}) -> NaN */
+		return DUK_DOUBLE_NAN;
 	}
 	default: {
 		/* number */
@@ -235,7 +239,7 @@ duk_double_t duk_js_tonumber(duk_hthread *thr, duk_tval *tv) {
  */
 
 /* exposed, used by e.g. duk_bi_date.c */
-duk_double_t duk_js_tointeger_number(duk_double_t x) {
+DUK_INTERNAL duk_double_t duk_js_tointeger_number(duk_double_t x) {
 	duk_small_int_t c = (duk_small_int_t) DUK_FPCLASSIFY(x);
 
 	if (c == DUK_FP_NAN) {
@@ -255,7 +259,7 @@ duk_double_t duk_js_tointeger_number(duk_double_t x) {
 	}
 }
 
-duk_double_t duk_js_tointeger(duk_hthread *thr, duk_tval *tv) {
+DUK_INTERNAL duk_double_t duk_js_tointeger(duk_hthread *thr, duk_tval *tv) {
 	duk_double_t d = duk_js_tonumber(thr, tv);  /* invalidates tv */
 	return duk_js_tointeger_number(d);
 }
@@ -264,8 +268,8 @@ duk_double_t duk_js_tointeger(duk_hthread *thr, duk_tval *tv) {
  *  ToInt32(), ToUint32(), ToUint16()  (E5 Sections 9.5, 9.6, 9.7)
  */
 
-/* combined algorithm matching E5 Sections 9.5 and 9.6 */	
-static duk_double_t duk__toint32_touint32_helper(duk_double_t x, duk_bool_t is_toint32) {
+/* combined algorithm matching E5 Sections 9.5 and 9.6 */
+DUK_LOCAL duk_double_t duk__toint32_touint32_helper(duk_double_t x, duk_bool_t is_toint32) {
 	duk_small_int_t c = (duk_small_int_t) DUK_FPCLASSIFY(x);
 	duk_small_int_t s;
 
@@ -280,7 +284,7 @@ static duk_double_t duk__toint32_touint32_helper(duk_double_t x, duk_bool_t is_t
 	if (s) {
 		x = -x;
 	}
-	
+
 	/* NOTE: fmod(x) result sign is same as sign of x, which
 	 * differs from what Javascript wants (see Section 9.6).
 	 */
@@ -303,7 +307,7 @@ static duk_double_t duk__toint32_touint32_helper(duk_double_t x, duk_bool_t is_t
 	return x;
 }
 
-duk_int32_t duk_js_toint32(duk_hthread *thr, duk_tval *tv) {
+DUK_INTERNAL duk_int32_t duk_js_toint32(duk_hthread *thr, duk_tval *tv) {
 	duk_double_t d = duk_js_tonumber(thr, tv);  /* invalidates tv */
 	d = duk__toint32_touint32_helper(d, 1);
 	DUK_ASSERT(DUK_FPCLASSIFY(d) == DUK_FP_ZERO || DUK_FPCLASSIFY(d) == DUK_FP_NORMAL);
@@ -313,7 +317,7 @@ duk_int32_t duk_js_toint32(duk_hthread *thr, duk_tval *tv) {
 }
 
 
-duk_uint32_t duk_js_touint32(duk_hthread *thr, duk_tval *tv) {
+DUK_INTERNAL duk_uint32_t duk_js_touint32(duk_hthread *thr, duk_tval *tv) {
 	duk_double_t d = duk_js_tonumber(thr, tv);  /* invalidates tv */
 	d = duk__toint32_touint32_helper(d, 0);
 	DUK_ASSERT(DUK_FPCLASSIFY(d) == DUK_FP_ZERO || DUK_FPCLASSIFY(d) == DUK_FP_NORMAL);
@@ -323,7 +327,7 @@ duk_uint32_t duk_js_touint32(duk_hthread *thr, duk_tval *tv) {
 
 }
 
-duk_uint16_t duk_js_touint16(duk_hthread *thr, duk_tval *tv) {
+DUK_INTERNAL duk_uint16_t duk_js_touint16(duk_hthread *thr, duk_tval *tv) {
 	/* should be a safe way to compute this */
 	return (duk_uint16_t) (duk_js_touint32(thr, tv) & 0x0000ffffU);
 }
@@ -347,7 +351,7 @@ duk_uint16_t duk_js_touint16(duk_hthread *thr, duk_tval *tv) {
  */
 
 #if 0  /* unused */
-void duk_js_checkobjectcoercible(duk_hthread *thr, duk_tval *tv_x) {
+DUK_INTERNAL void duk_js_checkobjectcoercible(duk_hthread *thr, duk_tval *tv_x) {
 	duk_small_uint_t tag = DUK_TVAL_GET_TAG(tv_x);
 
 	/* Note: this must match ToObject() behavior */
@@ -369,7 +373,7 @@ void duk_js_checkobjectcoercible(duk_hthread *thr, duk_tval *tv_x) {
  */
 
 #if 0  /* unused */
-int duk_js_iscallable(duk_tval *tv_x) {
+DUK_INTERNAL duk_bool_t duk_js_iscallable(duk_tval *tv_x) {
 	duk_hobject *obj;
 
 	if (!DUK_TVAL_IS_OBJECT(tv_x)) {
@@ -400,7 +404,7 @@ int duk_js_iscallable(duk_tval *tv_x) {
  *  - E5 Section 11.9.6, step 4 (strict)
  */
 
-static duk_bool_t duk__js_equals_number(duk_double_t x, duk_double_t y) {
+DUK_LOCAL duk_bool_t duk__js_equals_number(duk_double_t x, duk_double_t y) {
 #if defined(DUK_USE_PARANOID_MATH)
 	/* Straightforward algorithm, makes fewer compiler assumptions. */
 	duk_small_int_t cx = (duk_small_int_t) DUK_FPCLASSIFY(x);
@@ -438,7 +442,7 @@ static duk_bool_t duk__js_equals_number(duk_double_t x, duk_double_t y) {
 #endif  /* DUK_USE_PARANOID_MATH */
 }
 
-static duk_bool_t duk__js_samevalue_number(duk_double_t x, duk_double_t y) {
+DUK_LOCAL duk_bool_t duk__js_samevalue_number(duk_double_t x, duk_double_t y) {
 #if defined(DUK_USE_PARANOID_MATH)
 	duk_small_int_t cx = (duk_small_int_t) DUK_FPCLASSIFY(x);
 	duk_small_int_t cy = (duk_small_int_t) DUK_FPCLASSIFY(y);
@@ -505,7 +509,7 @@ static duk_bool_t duk__js_samevalue_number(duk_double_t x, duk_double_t y) {
 #endif  /* DUK_USE_PARANOID_MATH */
 }
 
-duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y, duk_small_int_t flags) {
+DUK_INTERNAL duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y, duk_small_int_t flags) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_tval *tv_tmp;
 
@@ -563,8 +567,8 @@ duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y
 				if (len_x != len_y) {
 					return 0;
 				}
-				buf_x = (void *) DUK_HBUFFER_GET_DATA_PTR(h_x);
-				buf_y = (void *) DUK_HBUFFER_GET_DATA_PTR(h_y);
+				buf_x = (void *) DUK_HBUFFER_GET_DATA_PTR(thr->heap, h_x);
+				buf_y = (void *) DUK_HBUFFER_GET_DATA_PTR(thr->heap, h_y);
 				/* if len_x == len_y == 0, buf_x and/or buf_y may
 				 * be NULL, but that's OK.
 				 */
@@ -573,6 +577,19 @@ duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y
 				DUK_ASSERT(len_y == 0 || buf_y != NULL);
 				return (DUK_MEMCMP(buf_x, buf_y, len_x) == 0) ? 1 : 0;
 			}
+		}
+		case DUK_TAG_LIGHTFUNC: {
+			/* At least 'magic' has a significant impact on function
+			 * identity.
+			 */
+			duk_small_uint_t lf_flags_x;
+			duk_small_uint_t lf_flags_y;
+			duk_c_function func_x;
+			duk_c_function func_y;
+
+			DUK_TVAL_GET_LIGHTFUNC(tv_x, func_x, lf_flags_x);
+			DUK_TVAL_GET_LIGHTFUNC(tv_y, func_y, lf_flags_y);
+			return ((func_x == func_y) && (lf_flags_x == lf_flags_y)) ? 1 : 0;
 		}
 		default: {
 			DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv_x));
@@ -638,7 +655,7 @@ duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y
 			return 0;
 		}
 		buf_x = (void *) DUK_HSTRING_GET_DATA(h_x);
-		buf_y = (void *) DUK_HBUFFER_GET_DATA_PTR(h_y);
+		buf_y = (void *) DUK_HBUFFER_GET_DATA_PTR(thr->heap, h_y);
 		/* if len_x == len_y == 0, buf_x and/or buf_y may
 		 * be NULL, but that's OK.
 		 */
@@ -702,7 +719,7 @@ duk_bool_t duk_js_equals_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y
  * needs to push stuff on the stack anyway...
  */
 
-duk_small_int_t duk_js_string_compare(duk_hstring *h1, duk_hstring *h2) {
+DUK_INTERNAL duk_small_int_t duk_js_string_compare(duk_hstring *h1, duk_hstring *h2) {
 	/*
 	 *  String comparison (E5 Section 11.8.5, step 4), which
 	 *  needs to compare codepoint by codepoint.
@@ -756,13 +773,42 @@ duk_small_int_t duk_js_string_compare(duk_hstring *h1, duk_hstring *h2) {
 	return 0;
 }
 
-duk_bool_t duk_js_compare_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y, duk_small_int_t flags) {
+DUK_INTERNAL duk_bool_t duk_js_compare_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y, duk_small_int_t flags) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_double_t d1, d2;
 	duk_small_int_t c1, c2;
 	duk_small_int_t s1, s2;
 	duk_small_int_t rc;
 	duk_bool_t retval;
+
+	/* Very often compared values are plain numbers, so handle that case
+	 * as the fast path without any stack operations and such.
+	 */
+#if 1  /* XXX: make fast paths optional for size minimization? */
+	if (DUK_TVAL_IS_NUMBER(tv_x) && DUK_TVAL_IS_NUMBER(tv_y)) {
+		d1 = DUK_TVAL_GET_NUMBER(tv_x);
+		d2 = DUK_TVAL_GET_NUMBER(tv_y);
+		c1 = DUK_FPCLASSIFY(d1);
+		c2 = DUK_FPCLASSIFY(d2);
+
+		if (c1 == DUK_FP_NORMAL && c2 == DUK_FP_NORMAL) {
+			/* XXX: this is a very narrow check, and doesn't cover
+			 * zeroes, subnormals, infinities, which compare normally.
+			 */
+
+			if (d1 < d2) {
+				/* 'lt is true' */
+				retval = 1;
+			} else {
+				retval = 0;
+			}
+			if (flags & DUK_COMPARE_FLAG_NEGATE) {
+				retval ^= 1;
+			}
+			return retval;
+		}
+	}
+#endif
 
 	duk_push_tval(ctx, tv_x);
 	duk_push_tval(ctx, tv_y);
@@ -900,7 +946,7 @@ duk_bool_t duk_js_compare_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_
  *  For other objects, a TypeError is thrown.
  */
 
-duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
+DUK_INTERNAL duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_hobject *func;
 	duk_hobject *val;
@@ -910,6 +956,11 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	/*
 	 *  Get the values onto the stack first.  It would be possible to cover
 	 *  some normal cases without resorting to the value stack.
+	 *
+	 *  The right hand side could be a light function (as they generally
+	 *  behave like objects).  Light functions never have a 'prototype'
+	 *  property so E5.1 Section 15.3.5.3 step 3 always throws a TypeError.
+	 *  Using duk_require_hobject() is thus correct (except for error msg).
 	 */
 
 	duk_push_tval(ctx, tv_x);
@@ -934,7 +985,7 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 
 		if (!DUK_HOBJECT_IS_CALLABLE(func)) {
 			/*
-		 	 *  Note: of native Ecmascript objects, only Function instances
+			 *  Note: of native Ecmascript objects, only Function instances
 			 *  have a [[HasInstance]] internal property.  Custom objects might
 			 *  also have it, but not in current implementation.
 			 *
@@ -971,7 +1022,9 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 
 	/* [ ... lval rval(func) ] */
 
-	val = duk_get_hobject(ctx, -2);
+	/* Handle lightfuncs through object coercion for now. */
+	/* XXX: direct implementation */
+	val = duk_get_hobject_or_lfunc_coerce(ctx, -2);
 	if (!val) {
 		goto pop_and_false;
 	}
@@ -1000,7 +1053,7 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 		 *  also the built-in Function prototype, the result is true.
 		 */
 
-		val = val->prototype;
+		val = DUK_HOBJECT_GET_PROTOTYPE(thr->heap, val);
 
 		if (!val) {
 			goto pop_and_false;
@@ -1012,7 +1065,7 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	} while (--sanity > 0);
 
 	if (sanity == 0) {
-		DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, "instanceof prototype chain sanity exceeded");
+		DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
 	}
 	DUK_UNREACHABLE();
 
@@ -1034,8 +1087,8 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
  *
  *  Basically just a property existence check using [[HasProperty]].
  */
-	
-duk_bool_t duk_js_in(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
+
+DUK_INTERNAL duk_bool_t duk_js_in(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_bool_t retval;
 
@@ -1053,9 +1106,12 @@ duk_bool_t duk_js_in(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	 * form (which is a shame).
 	 */
 
+	/* TypeError if rval is not an object (or lightfunc which should behave
+	 * like a Function instance).
+	 */
 	duk_push_tval(ctx, tv_x);
 	duk_push_tval(ctx, tv_y);
-	(void) duk_require_hobject(ctx, -1);  /* TypeError if rval not object */
+	duk_require_type_mask(ctx, -1, DUK_TYPE_MASK_OBJECT | DUK_TYPE_MASK_LIGHTFUNC);
 	duk_to_string(ctx, -2);               /* coerce lval with ToString() */
 
 	retval = duk_hobject_hasprop(thr, duk_get_tval(ctx, -1), duk_get_tval(ctx, -2));
@@ -1078,7 +1134,7 @@ duk_bool_t duk_js_in(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
  *  lowercase variants now.
  */
 
-duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
+DUK_INTERNAL duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
 	duk_small_int_t stridx = 0;
 
 	switch (DUK_TVAL_GET_TAG(tv_x)) {
@@ -1119,6 +1175,10 @@ duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
 		stridx = DUK_STRIDX_LC_BUFFER;
 		break;
 	}
+	case DUK_TAG_LIGHTFUNC: {
+		stridx = DUK_STRIDX_LC_FUNCTION;
+		break;
+	}
 	default: {
 		/* number */
 		DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv_x));
@@ -1128,7 +1188,7 @@ duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
 	}
 
 	DUK_ASSERT(stridx >= 0 && stridx < DUK_HEAP_NUM_STRINGS);
-	return thr->strs[stridx];
+	return DUK_HTHREAD_GET_STRING(thr, stridx);
 }
 
 /*
@@ -1141,7 +1201,7 @@ duk_hstring *duk_js_typeof(duk_hthread *thr, duk_tval *tv_x) {
  *  call duk_js_to_arrayindex_string_helper().
  */
 
-duk_small_int_t duk_js_to_arrayindex_raw_string(duk_uint8_t *str, duk_uint32_t blen, duk_uarridx_t *out_idx) {
+DUK_INTERNAL duk_small_int_t duk_js_to_arrayindex_raw_string(const duk_uint8_t *str, duk_uint32_t blen, duk_uarridx_t *out_idx) {
 	duk_uarridx_t res, new_res;
 
 	if (blen == 0 || blen > 10) {
@@ -1177,10 +1237,10 @@ duk_small_int_t duk_js_to_arrayindex_raw_string(duk_uint8_t *str, duk_uint32_t b
  parse_fail:
 	*out_idx = DUK_HSTRING_NO_ARRAY_INDEX;
 	return 0;
-}	
+}
 
 /* Called by duk_hstring.h macros */
-duk_uarridx_t duk_js_to_arrayindex_string_helper(duk_hstring *h) {
+DUK_INTERNAL duk_uarridx_t duk_js_to_arrayindex_string_helper(duk_hstring *h) {
 	duk_uarridx_t res;
 	duk_small_int_t rc;
 

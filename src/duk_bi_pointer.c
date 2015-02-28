@@ -8,8 +8,8 @@
  *  Constructor
  */
 
-duk_ret_t duk_bi_pointer_constructor(duk_context *ctx) {
-	/* FIXME: this behavior is quite useless now; it would be nice to be able
+DUK_INTERNAL duk_ret_t duk_bi_pointer_constructor(duk_context *ctx) {
+	/* XXX: this behavior is quite useless now; it would be nice to be able
 	 * to create pointer values from e.g. numbers or strings.  Numbers are
 	 * problematic on 64-bit platforms though.  Hex encoded strings?
 	 */
@@ -29,7 +29,7 @@ duk_ret_t duk_bi_pointer_constructor(duk_context *ctx) {
 
 		/* Pointer object internal value is immutable */
 		duk_dup(ctx, 0);
-		duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
+		duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
 	}
 	/* Note: unbalanced stack on purpose */
 
@@ -40,9 +40,9 @@ duk_ret_t duk_bi_pointer_constructor(duk_context *ctx) {
  *  toString(), valueOf()
  */
 
-duk_ret_t duk_bi_pointer_prototype_tostring_shared(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_pointer_prototype_tostring_shared(duk_context *ctx) {
 	duk_tval *tv;
-	duk_small_int_t to_string = duk_get_magic(ctx);
+	duk_small_int_t to_string = duk_get_current_magic(ctx);
 
 	duk_push_this(ctx);
 	tv = duk_require_tval(ctx, -1);

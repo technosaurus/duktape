@@ -9,7 +9,7 @@
 /* Prepare value stack for a method call through an object property.
  * May currently throw an error e.g. when getting the property.
  */
-static void duk__call_prop_prep_stack(duk_context *ctx, duk_idx_t normalized_obj_index, duk_idx_t nargs) {
+DUK_LOCAL void duk__call_prop_prep_stack(duk_context *ctx, duk_idx_t normalized_obj_index, duk_idx_t nargs) {
 	DUK_DDD(DUK_DDDPRINT("duk__call_prop_prep_stack, normalized_obj_index=%ld, nargs=%ld, stacktop=%ld",
 	                     (long) normalized_obj_index, (long) nargs, (long) duk_get_top(ctx)));
 
@@ -33,7 +33,7 @@ static void duk__call_prop_prep_stack(duk_context *ctx, duk_idx_t normalized_obj
 	/* [... func this arg1 ... argN] */
 }
 
-void duk_call(duk_context *ctx, duk_idx_t nargs) {
+DUK_EXTERNAL void duk_call(duk_context *ctx, duk_idx_t nargs) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_small_uint_t call_flags;
 	duk_idx_t idx_func;
@@ -62,7 +62,7 @@ void duk_call(duk_context *ctx, duk_idx_t nargs) {
 	DUK_UNREF(rc);
 }
 
-void duk_call_method(duk_context *ctx, duk_idx_t nargs) {
+DUK_EXTERNAL void duk_call_method(duk_context *ctx, duk_idx_t nargs) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_small_uint_t call_flags;
 	duk_idx_t idx_func;
@@ -85,7 +85,7 @@ void duk_call_method(duk_context *ctx, duk_idx_t nargs) {
 	DUK_UNREF(rc);
 }
 
-void duk_call_prop(duk_context *ctx, duk_idx_t obj_index, duk_idx_t nargs) {
+DUK_EXTERNAL void duk_call_prop(duk_context *ctx, duk_idx_t obj_index, duk_idx_t nargs) {
 	/*
 	 *  XXX: if duk_handle_call() took values through indices, this could be
 	 *  made much more sensible.  However, duk_handle_call() needs to fudge
@@ -100,7 +100,7 @@ void duk_call_prop(duk_context *ctx, duk_idx_t obj_index, duk_idx_t nargs) {
 	duk_call_method(ctx, nargs);
 }
 
-duk_int_t duk_pcall(duk_context *ctx, duk_idx_t nargs) {
+DUK_EXTERNAL duk_int_t duk_pcall(duk_context *ctx, duk_idx_t nargs) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_small_uint_t call_flags;
 	duk_idx_t idx_func;
@@ -138,7 +138,7 @@ duk_int_t duk_pcall(duk_context *ctx, duk_idx_t nargs) {
 	return rc;
 }
 
-duk_int_t duk_pcall_method(duk_context *ctx, duk_idx_t nargs) {
+DUK_EXTERNAL duk_int_t duk_pcall_method(duk_context *ctx, duk_idx_t nargs) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_small_uint_t call_flags;
 	duk_idx_t idx_func;
@@ -163,7 +163,7 @@ duk_int_t duk_pcall_method(duk_context *ctx, duk_idx_t nargs) {
 	return rc;
 }
 
-static duk_ret_t duk__pcall_prop_raw(duk_context *ctx) {
+DUK_LOCAL duk_ret_t duk__pcall_prop_raw(duk_context *ctx) {
 	duk_idx_t obj_index;
 	duk_idx_t nargs;
 
@@ -181,7 +181,7 @@ static duk_ret_t duk__pcall_prop_raw(duk_context *ctx) {
 	return 1;
 }
 
-duk_int_t duk_pcall_prop(duk_context *ctx, duk_idx_t obj_index, duk_idx_t nargs) {
+DUK_EXTERNAL duk_int_t duk_pcall_prop(duk_context *ctx, duk_idx_t obj_index, duk_idx_t nargs) {
 	/*
 	 *  Must be careful to catch errors related to value stack manipulation
 	 *  and property lookup, not just the call itself.
@@ -197,7 +197,7 @@ duk_int_t duk_pcall_prop(duk_context *ctx, duk_idx_t obj_index, duk_idx_t nargs)
 	return duk_safe_call(ctx, duk__pcall_prop_raw, nargs + 1 + 2 /*nargs*/, 1 /*nrets*/);
 }
 
-duk_int_t duk_safe_call(duk_context *ctx, duk_safe_call_function func, duk_idx_t nargs, duk_idx_t nrets) {
+DUK_EXTERNAL duk_int_t duk_safe_call(duk_context *ctx, duk_safe_call_function func, duk_idx_t nargs, duk_idx_t nrets) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_int_t rc;
 
@@ -218,7 +218,7 @@ duk_int_t duk_safe_call(duk_context *ctx, duk_safe_call_function func, duk_idx_t
 	return rc;
 }
 
-void duk_new(duk_context *ctx, duk_idx_t nargs) {
+DUK_EXTERNAL void duk_new(duk_context *ctx, duk_idx_t nargs) {
 	/*
 	 *  There are two [[Construct]] operations in the specification:
 	 *
@@ -396,7 +396,7 @@ void duk_new(duk_context *ctx, duk_idx_t nargs) {
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, DUK_STR_NOT_CONSTRUCTABLE);
 }
 
-duk_bool_t duk_is_constructor_call(duk_context *ctx) {
+DUK_EXTERNAL duk_bool_t duk_is_constructor_call(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
 
@@ -405,26 +405,40 @@ duk_bool_t duk_is_constructor_call(duk_context *ctx) {
 	DUK_ASSERT_DISABLE(thr->callstack_top >= 0);
 
 	act = duk_hthread_get_current_activation(thr);
-	return (act != NULL && (act->flags & DUK_ACT_FLAG_CONSTRUCT) != 0 ? 1 : 0);
+	DUK_ASSERT(act != NULL);  /* because callstack_top > 0 */
+	return ((act->flags & DUK_ACT_FLAG_CONSTRUCT) != 0 ? 1 : 0);
 }
 
-duk_bool_t duk_is_strict_call(duk_context *ctx) {
+DUK_EXTERNAL duk_bool_t duk_is_strict_call(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
+
+	/* For user code this could just return 1 (strict) always
+	 * because all Duktape/C functions are considered strict,
+	 * and strict is also the default when nothing is running.
+	 * However, Duktape may call this function internally when
+	 * the current activation is an Ecmascript function, so
+	 * this cannot be replaced by a 'return 1' without fixing
+	 * the internal call sites.
+	 */
 
 	DUK_ASSERT(ctx != NULL);
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT_DISABLE(thr->callstack_top >= 0);
 
 	act = duk_hthread_get_current_activation(thr);
-	return (act != NULL && (act->flags & DUK_ACT_FLAG_STRICT) != 0 ? 1 : 0);
+	if (act == NULL) {
+		/* Strict by default. */
+		return 1;
+	}
+	return ((act->flags & DUK_ACT_FLAG_STRICT) != 0 ? 1 : 0);
 }
 
 /*
  *  Duktape/C function magic
  */
 
-duk_int_t duk_get_magic(duk_context *ctx) {
+DUK_EXTERNAL duk_int_t duk_get_current_magic(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
 	duk_hobject *func;
@@ -435,7 +449,13 @@ duk_int_t duk_get_magic(duk_context *ctx) {
 
 	act = duk_hthread_get_current_activation(thr);
 	if (act) {
-		func = act->func;
+		func = DUK_ACT_GET_FUNC(act);
+		if (!func) {
+			duk_tval *tv = &act->tv_func;
+			duk_small_uint_t lf_flags;
+			lf_flags = DUK_TVAL_GET_LIGHTFUNC_FLAGS(tv);
+			return (duk_int_t) DUK_LFUNC_FLAGS_GET_MAGIC(lf_flags);
+		}
 		DUK_ASSERT(func != NULL);
 
 		if (DUK_HOBJECT_IS_NATIVEFUNCTION(func)) {
@@ -444,4 +464,40 @@ duk_int_t duk_get_magic(duk_context *ctx) {
 		}
 	}
 	return 0;
+}
+
+DUK_EXTERNAL duk_int_t duk_get_magic(duk_context *ctx, duk_idx_t index) {
+	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_tval *tv;
+	duk_hobject *h;
+
+	DUK_ASSERT(ctx != NULL);
+
+	tv = duk_require_tval(ctx, index);
+	if (DUK_TVAL_IS_OBJECT(tv)) {
+		h = DUK_TVAL_GET_OBJECT(tv);
+		DUK_ASSERT(h != NULL);
+		if (!DUK_HOBJECT_HAS_NATIVEFUNCTION(h)) {
+			goto type_error;
+		}
+		return (duk_int_t) ((duk_hnativefunction *) h)->magic;
+	} else if (DUK_TVAL_IS_LIGHTFUNC(tv)) {
+		duk_small_uint_t lf_flags = DUK_TVAL_GET_LIGHTFUNC_FLAGS(tv);
+		return (duk_int_t) DUK_LFUNC_FLAGS_GET_MAGIC(lf_flags);
+	}
+
+	/* fall through */
+ type_error:
+	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, DUK_STR_UNEXPECTED_TYPE);
+	return 0;
+}
+
+DUK_EXTERNAL void duk_set_magic(duk_context *ctx, duk_idx_t index, duk_int_t magic) {
+	duk_hnativefunction *nf;
+
+	DUK_ASSERT(ctx != NULL);
+
+	nf = duk_require_hnativefunction(ctx, index);
+	DUK_ASSERT(nf != NULL);
+	nf->magic = (duk_int16_t) magic;
 }

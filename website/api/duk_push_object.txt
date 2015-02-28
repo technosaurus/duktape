@@ -5,8 +5,11 @@ duk_idx_t duk_push_object(duk_context *ctx);
 [ ... ] -> [ ... obj! ]
 
 =summary
-<p>Push an empty object to the stack.  Returns non-negative index (relative to stack bottom)
-of the pushed object.</p>
+<p>Push an empty object to the stack.  Returns non-negative index (relative
+to stack bottom) of the pushed object.</p>
+
+<p>The internal prototype of the created object is <code>Object.prototype</code>.
+Use <code><a href="#duk_set_prototype">duk_set_prototype()</a></code> to change it.</p>
 
 =example
 duk_idx_t obj_idx;
@@ -23,6 +26,5 @@ duk_pop(ctx);  /* pop object */
 stack
 object
 
-=fixme
-There is no way to give an initial size for object property table.
-This would be useful to minimize memory allocations.
+=introduced
+1.0.0

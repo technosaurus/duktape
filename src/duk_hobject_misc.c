@@ -4,7 +4,7 @@
 
 #include "duk_internal.h"
 
-duk_bool_t duk_hobject_prototype_chain_contains(duk_hthread *thr, duk_hobject *h, duk_hobject *p) {
+DUK_INTERNAL duk_bool_t duk_hobject_prototype_chain_contains(duk_hthread *thr, duk_hobject *h, duk_hobject *p, duk_bool_t ignore_loop) {
 	duk_uint_t sanity;
 
 	DUK_ASSERT(thr != NULL);
@@ -18,27 +18,30 @@ duk_bool_t duk_hobject_prototype_chain_contains(duk_hthread *thr, duk_hobject *h
 		}
 
 		if (sanity-- == 0) {
-			DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
+			if (ignore_loop) {
+				break;
+			} else {
+				DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
+			}
 		}
-		h = h->prototype;
+		h = DUK_HOBJECT_GET_PROTOTYPE(thr->heap, h);
 	} while (h);
 
 	return 0;
 }
 
-/* FIXME: needed? */
-void duk_hobject_set_prototype(duk_hthread *thr, duk_hobject *h, duk_hobject *p) {
+DUK_INTERNAL void duk_hobject_set_prototype(duk_hthread *thr, duk_hobject *h, duk_hobject *p) {
 #ifdef DUK_USE_REFERENCE_COUNTING
 	duk_hobject *tmp;
 
 	DUK_ASSERT(h);
-	tmp = h->prototype;
-	h->prototype = p;
+	tmp = DUK_HOBJECT_GET_PROTOTYPE(thr->heap, h);
+	DUK_HOBJECT_SET_PROTOTYPE(thr->heap, h, p);
 	DUK_HOBJECT_INCREF(thr, p);  /* avoid problems if p == h->prototype */
 	DUK_HOBJECT_DECREF(thr, tmp);
 #else
 	DUK_ASSERT(h);
 	DUK_UNREF(thr);
-	h->prototype = p;
+	DUK_HOBJECT_SET_PROTOTYPE(thr->heap, h, p);
 #endif
 }

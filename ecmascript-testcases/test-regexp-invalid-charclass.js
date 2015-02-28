@@ -2,12 +2,6 @@
  *  Some invalid character class cases.
  */
 
-/*---
-{
-    "knownissue": "some invalid character classes are accepted (e.g. '[\\d-z]' and '[z-x]')"
-}
----*/
-
 /*===
 SyntaxError
 ===*/
@@ -40,4 +34,3 @@ try {
 } catch(e) {
     print(e.name);
 }
-

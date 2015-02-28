@@ -10,8 +10,10 @@ such as:
 * Specific platforms and compilers
 * Size and performance optimization issues
 
-Conventions
-===========
+Some code conventions are checked by the ``make codepolicycheck`` target.
+
+Basic conventions
+=================
 
 Indentantion, naming, etc
 -------------------------
@@ -124,18 +126,30 @@ Multi-statement macros should use a ``do-while(0)`` construct::
                   y = y * y; \
           } while (0)
 
+When the body of a macro is sometimes empty, use an empty do-while so that
+the macro still yields a statement::
+
+  #if defined(DUK_USE_FROB)
+  #define  FROBNICATE(x,y)  do { \
+                  x = x * x; \
+                  y = y * y; \
+          } while (0)
+  #else
+  #define  FROBNICATE(x,y)  do { } while (0)
+  #endif
+
 Use parentheses when referring to macro arguments and the final macro
 result to minimize error proneness::
 
-  #define  MULTIPLY(a,b)  ((a)*(b))
+  #define  MULTIPLY(a,b)  ((a) * (b))
 
-  /* Now MULTIPLY(1+2,3) expands to ((1+2)*(3)) == 9, not
-   * 1+2*3 == 7.  Parentheses are used around macro result for
+  /* Now MULTIPLY(1 + 2, 3) expands to ((1 + 2) * (3)) == 9, not
+   * 1 + 2 * 3 == 7.  Parentheses are used around macro result for
    * similar reasons.
    */
 
-Variable declarations
----------------------
+Local variable declarations
+---------------------------
 
 C variables should only be declared in the beginning of the block.  Although
 this is usually not a portability concern, some older still compilers require
@@ -174,6 +188,59 @@ The fix is::
 
           x = 123;
           ...
+  }
+
+Other variable declarations
+---------------------------
+
+Use symbol visibility macros throughout.
+
+For DUK_INTERNAL_DECL macro use a DUK_SINGLE_FILE wrapper check to avoid
+both declaring and defining a static variable (see GH-63)::
+
+  /* Header: declare internal variable visible across files. */
+  #if !defined(DUK_SINGLE_FILE)
+  DUK_INTERNAL_DECL int duk_internal_foo;
+  #endif  /* !DUK_SINGLE_FILE */
+
+  /* Source: define the variable. */
+  DUK_INTERNAL int duk_internal_foo;
+
+Function declarations and definitions
+-------------------------------------
+
+For functions with a small number of arguments::
+
+  DUK_INTERNAL_DECL void foo(duk_context *ctx, duk_idx_t idx);
+
+In definition opening brace on same line::
+
+  DUK_INTERNAL void foo(duk_context *ctx, duk_idx_t idx) {
+          /* ... */
+  }
+
+If there are too many arguments to fit one line comfortably, symbol
+visibility macro (and other macros) on a separate line, arguments
+aligned with spaces::
+
+  DUK_INTERNAL_DECL
+  void foo(duk_context *ctx,
+           duk_idx_t idx,
+           duk_uint_t foo,
+           duk_uint_t bar,
+           duk_uint_t quux,
+           duk_uint_t baz);,
+
+Again opening brace on the same line::
+
+  DUK_INTERNAL
+  void foo(duk_context *ctx,
+           duk_idx_t idx,
+           duk_uint_t foo,
+           duk_uint_t bar,
+           duk_uint_t quux,
+           duk_uint_t baz) {
+          /* ... */
   }
 
 Function calls with many difficult-to-identify arguments
@@ -323,8 +390,11 @@ To achieve this:
 
 * Use explicit casts for all pointer conversions.
 
+* Make sure there are no ``static`` forward declarations for *data symbols*,
+  see symbol visibility section.
+
 Debug macros
-============
+------------
 
 Debug macros unfortunately need double wrapping to deal with lack of variadic
 macros on pre-C99 platforms::
@@ -338,6 +408,128 @@ platforms the outer macro allows a debug log write to be omitted entirely.
 If the log writes are not omitted, the workaround for lack of variadic
 macros causes a lot of warnings with some compilers.  With this wrapping,
 at least the non-debug build will be clean on non-C99 compilers.
+
+Symbol visibility
+=================
+
+Symbol visibility issues
+------------------------
+
+There are several issues related to symbol visibility:
+
+* Minimality: Duktape should only expose the function and data symbols that
+  are used by calling programs.  This is a hygiene issue but also affects
+  compiler optimization: if a function is internal, it doesn't need to conform
+  to a rigid ABI which allows some optimizations.  See e.g.
+  https://gcc.gnu.org/wiki/Visibility.
+
+* Single file vs. separate files: symbols need to be declared differently
+  depending on whether Duktape is compiled from a single file source or
+  multiple source files.
+
+* Compiling Duktape vs. compiling application: some compiler attributes need
+  to be set differently when compiling Duktape vs. compiling the application
+  (see MSVC below).
+
+* Compiler dependency: controlling link visibility of non-static symbols
+  requires compiler specific mechanisms.
+
+Symbol visibility macros
+------------------------
+
+All Duktape symbols are declared with one of the following prefix macros:
+
+* ``DUK_EXTERNAL_DECL`` and ``DUK_EXTERNAL``: symbol is exposed to calling
+  application.  May require compiler specific link specification.
+
+* ``DUK_INTERNAL_DECL`` and ``DUK_INTERNAL``: symbol is internal to Duktape,
+  but may reside in another compilation unit.  May require compiler specific
+  link specification.
+
+* ``DUK_LOCAL_DECL`` and ``DUK_LOCAL``: symbol is file local.  This maps to
+  ``static`` and currently requires no compiler specific treatment.
+
+As usual, ``duk_features.h.in`` defines these visibility symbols as
+appropriate, taking into account both the compiler and whether Duktape
+is being compiled from a single or multiple files.
+
+Missing a visibility macro is not critical on GCC: it will just pollute
+the symbol table.  On MSVC it can make break a DLL build of Duktape.
+
+Avoid "static" forward declarations for data symbols
+----------------------------------------------------
+
+C++ does not allow a ``static`` variable to be both forward declared and
+defined (see GH-63 for more discussion).  It's also not ideal for C and
+is a potential portability issue.  This issue is avoided by:
+
+* Not using ``DUK_LOCAL_DECL`` for local data symbols: it would always map
+  to a ``static`` data declaration.
+
+* Not using ``DUK_INTERNAL_DECL`` for data symbols when compiling from the
+  single file distribution: such data symbols would map to ``static`` in
+  the single file distribution (but not in the multiple files distribution
+  where the declarations are needed).
+
+The ``DUK_INTERNAL_DECL`` idiom is::
+
+  #if !defined(DUK_SINGLE_FILE)
+  DUK_INTERNAL_DECL const char *duk_str_not_object;
+  #endif  /* !DUK_SINGLE_FILE */
+
+Concrete example
+----------------
+
+As a concrete example, this is how these defines work with GCC 4.x.x.
+For function declaration in header::
+
+    /* Header file */
+    DUK_EXTERNAL_DECL void foo(void);
+    DUK_INTERNAL_DECL void foo(void);
+    DUK_LOCAL_DECL void foo(void);
+
+    /* Single file */
+    __attribute__ ((visibility("default"))) extern void foo(void);
+    static void foo(void);
+    static void foo(void);
+
+    /* Separate files */
+    __attribute__ ((visibility("default"))) extern void foo(void);
+    __attribute__ ((visibility("hidden"))) extern void foo(void);
+    static void foo(void);
+
+For the actual function declaration::
+
+    /* Source file */
+    DUK_EXTERNAL void foo(void) { ... }
+    DUK_INTERNAL void foo(void) { ... }
+    DUK_LOCAL void foo(void) { ... }
+
+    /* Single file */
+    __attribute__ ((visibility("default"))) void foo(void) { ... }
+    static void foo(void) { ... }
+    static void foo(void) { ... }
+
+    /* Separate files */
+    __attribute__ ((visibility("default"))) void foo(void) { ... }
+    __attribute__ ((visibility("hidden"))) void foo(void) { ... }
+    static void foo(void) { ... }
+
+As seen from this example, different outcomes are needed for forward
+declaring a symbol and actually defining the symbol.  For now, the same
+macros work for function and data symbols.
+
+MSVC DLL import/export
+----------------------
+
+For MSVC, DLL import/export attributes are needed to build as a DLL.
+When compiling Duktape public symbols should be declared as "dllexport"
+in both header files and the actual declarations.  When compiling a
+user application, the same header symbols must be declared as "dllimport".
+The compilation context is available through ``DUK_COMPILING_DUKTAPE``.
+For more on MSVC dllimport/dllexport, see:
+
+* http://msdn.microsoft.com/en-us/library/y4h7bcy6.aspx
 
 Shared strings
 ==============
@@ -463,6 +655,43 @@ unwieldy.
 
 Portability concerns
 ====================
+
+No variadic macros
+------------------
+
+Lack of variadic macros can be worked around by using comma expressions.
+The ``duk_push_error_object()`` API call is a good example.  Without
+variadic macros it's defined as::
+
+    DUK_EXTERNAL_DECL duk_idx_t duk_push_error_object_stash(duk_context *ctx, duk_errcode_t err_code, const char *fmt, ...);
+    /* Note: parentheses are required so that the comma expression works in assignments. */
+    #define duk_push_error_object  \
+            (duk_api_global_filename = __FILE__, \
+            duk_api_global_line = (duk_int_t) (__LINE__), \
+            duk_push_error_object_stash)  /* last value is func pointer, arguments follow in parens */
+
+When you call it as::
+
+    int err_idx = duk_push_error_object(ctx, 123, "foo %s", "bar");
+
+It gets expanded to::
+
+    int err_idx = (duk_api_global_filename = __FILE__, \
+                   duk_api_global_line = (duk_int_t) (__LINE__), \
+                   duk_push_error_object_stash) (ctx, 123, "foo %s", "bar");
+
+The comma expression is evaluated in order performing the stash assignments.
+The final expression is a function pointer (``duk_push_error_object_stash``),
+and the parenthesized argument list is used to call the function.
+
+Note that the parentheses around the comma expression are required.  This would
+not work::
+
+    int err_idx = duk_api_global_filename = __FILE__, \
+                  duk_api_global_line = (duk_int_t) (__LINE__), \
+                  duk_push_error_object_stash (ctx, 123, "foo %s", "bar");
+
+The problem is that ``__FILE__`` gets assigned to err_idx.
 
 Missing or broken platform functions
 ------------------------------------
@@ -825,6 +1054,76 @@ EBCDIC
 ------
 
 See separate section below.
+
+Setjmp, longjmp, and volatile
+=============================
+
+When a local variable in the function containing a ``setjmp()`` gets changed
+between ``setjmp()`` and ``longjmp()`` there is no guarantee that the change
+is visible after a ``longjmp()`` unless the variable is declared volatile.
+It should be safe to:
+
+* Use non-volatile variables that are written before ``setjmp()`` and then
+  only read.
+
+* Use volatile variables which can be read and written at any point.
+
+When pointer values are changed, be careful with placement of "volatile"::
+
+    /* Non-volatile pointer, which points to a volatile integer. */
+    volatile int *ptr_x;
+
+    /* Volatile pointer, which points to a non-volatile integer. */
+    int * volatile x;
+
+When a pointer itself may be reassigned, the latter is correct, e.g.::
+
+    duk_hthread * volatile curr_thread;
+
+    curr_thread = thr;
+
+In practice it seems that some compilers have trouble guaranteeing these
+semantics for variables that are assigned to before ``setjmp()`` and not
+changed before ``longjmp()``.  For instance, there are crashes on OSX when
+using ``_setjmp()`` in such cases.  These crashes can be eliminated by
+declaring the variables volatile.  (It might be that adding the "volatile"
+changes the compiler output enough to mask a different bug though.)
+
+Optimizations may also cause odd situations, see e.g.:
+
+* http://blog.sam.liddicott.com/2013/09/why-are-setjmp-volatile-hacks-still.html
+
+To minimize the chances of the compiler handling setjmp/longjmp incorrectly,
+the cleanest approach would probable be to:
+
+* Declare all variables used in the ``setjmp()`` non-zero return case (when
+  called through ``longjmp()``) as volatile, so that we don't ever rely on
+  non-volatile variable values in that code path.
+
+Because volatile variables are slow (explicit read/write operations are
+generated for each access) it may be more practical to use explicit "save"
+variables, e.g.::
+
+    volatile int save_x;
+    int x;
+
+    if (setjmp(...)) {
+        x = save_x;
+        /* use 'x' normally */
+        return;
+    }
+
+    /* Assume foo(), bar(), quux() never longjmp(). */
+    x = foo();
+    x += bar();
+    x += quux();
+    save_x = x;  /* Save before any potential longjmp(). */
+
+    /* ... */
+
+(As of Duktape 1.1 this has not yet been done for all setjmp/longjmp
+functions.  Rather, volatile declarations have been added where they
+seem to be needed in practice.)
 
 Numeric types
 =============

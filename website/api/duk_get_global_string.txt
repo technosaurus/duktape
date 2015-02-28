@@ -27,3 +27,9 @@ duk_pop(ctx);
 
 =tags
 property
+
+=seealso
+duk_put_global_string
+
+=introduced
+1.0.0

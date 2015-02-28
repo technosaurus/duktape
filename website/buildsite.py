@@ -19,6 +19,7 @@ fancy_stack = True
 remove_fixme = True
 testcase_refs = False
 list_tags = False
+floating_list_tags = True
 fancy_releaselog = True
 
 dt_now = datetime.datetime.utcnow()
@@ -278,7 +279,30 @@ def processApiDoc(parts, funcname, testrefs, used_tags):
 	res = []
 
 	# the 'hidechar' span is to allow browser search without showing the char
-	res.append('<h1 id="%s"><a href="#%s"><span class="hidechar">.</span>%s()</a></h1>' % (funcname, funcname, funcname))
+	res.append('<h1 id="%s" class="apih1">' % funcname)
+	res.append('<a href="#%s"><span class="hidechar">.</span>%s()</a>' % (funcname, funcname))
+	if floating_list_tags and parts.has_key('tags'):
+		p = sorted(parts['tags'], reverse=True)  # reversed because floated to right (which reverses DOM order)
+
+		# For now, add the introduced version as a tag
+		if parts.has_key('introduced'):
+			p = [ parts['introduced'][0] ] + p
+		if parts.has_key('deprecated'):
+			# XXX: must mark deprecation
+			pass
+		if parts.has_key('removed'):
+			# XXX: must mark removal
+			pass
+
+		for idx, val in enumerate(p):
+			classes = [ 'apitag' ]
+			if val == 'experimental' or val == 'nonportable':
+				classes.append('apitagwarn')
+			if val == 'protected':
+				classes.append('apitagprotected')
+			res.append('<a class="' + ' '.join(classes) + '" ' +
+			           'href="#' + htmlEscape('taglist-' + val) + '">' + htmlEscape(val) + '</a>')
+	res.append('</h1>')
 
 	res.append('<div class="api-call">')
 
@@ -677,7 +701,7 @@ def createTagIndex(api_docs, used_tags):
 	res.append('<h1 id="bytag">API calls by tag</h1>')
 
 	for tag in used_tags:
-		res.append('<h2>' + htmlEscape(tag) + '</h2>')
+		res.append('<h2 id="taglist-' + htmlEscape(tag) + '">' + htmlEscape(tag) + '</h2>')
 		res.append('<ul class="taglist">')
 		for doc in api_docs:
 			if not doc['parts'].has_key('tags'):
@@ -827,12 +851,22 @@ def generateDownloadPage(releases_filename):
 
 	if fancy_releaselog:
 		# fancy releaselog
-		rel_data = rst2Html(os.path.abspath(os.path.join('..', 'RELEASES.txt')))
+		rel_data = rst2Html(os.path.abspath(os.path.join('..', 'RELEASES.rst')))
 		rel_soup = BeautifulSoup(rel_data)
 		released = rel_soup.select('#released')[0]
 		# massage the rst2html generated HTML to be more suitable
 		for elem in released.select('h1'):
 			elem.extract()
+
+		# Extract and reinsert release versions to reverse their order
+		# (newest release first).
+		rel_list = released.select('.section')
+		for rel in rel_list:
+			rel.extract()
+		rel_list.reverse()
+		for rel in rel_list:
+			released.append(rel)
+
 		releaselog_elem = down_soup.select('#releaselog')[0]
 		releaselog_elem.insert_after(released)
 	else:
@@ -856,7 +890,7 @@ def generateDownloadPage(releases_filename):
 			continue
 		href = tmp[0].select('a')[0]['href']
 		hash_elem = tr.select('.hash')[0]
-		hash_elem.string = getFileMd5(os.path.abspath(os.path.join('binaries', href))) or '???'
+		hash_elem.string = getFileMd5(os.path.abspath(os.path.join('..', 'duktape-releases', href))) or '???'
 
 	tmp_soup = templ_soup.select('#site-middle')[0]
 	tmp_soup.clear()
@@ -891,15 +925,21 @@ def generateGuide():
 	navlinks.append(['#customdirectives', 'Custom directives'])
 	navlinks.append(['#errorobjects', 'Error objects'])
 	navlinks.append(['#functionobjects', 'Function objects'])
+	navlinks.append(['#debugger', 'Debugger'])
 	navlinks.append(['#modules', 'Modules'])
+	navlinks.append(['#logging', 'Logging'])
 	navlinks.append(['#finalization', 'Finalization'])
 	navlinks.append(['#coroutines', 'Coroutines'])
 	navlinks.append(['#virtualproperties', 'Virtual properties'])
 	navlinks.append(['#internalproperties', 'Internal properties'])
-	navlinks.append(['#compiling', 'Compiling'])
+	navlinks.append(['#threading', 'Threading'])
+	navlinks.append(['#sandboxing', 'Sandboxing'])
 	navlinks.append(['#performance', 'Performance'])
+	navlinks.append(['#memoryusage', 'Memory usage'])
+	navlinks.append(['#compiling', 'Compiling'])
 	navlinks.append(['#portability', 'Portability'])
 	navlinks.append(['#compatibility', 'Compatibility'])
+	navlinks.append(['#versioning', 'Versioning'])
 	navlinks.append(['#limitations', 'Limitations'])
 	navlinks.append(['#comparisontolua', 'Comparison to Lua'])
 	res.append('<ul>')
@@ -931,15 +971,21 @@ def generateGuide():
 	res += processRawDoc('guide/customdirectives.html')
 	res += processRawDoc('guide/errorobjects.html')
 	res += processRawDoc('guide/functionobjects.html')
+	res += processRawDoc('guide/debugger.html')
 	res += processRawDoc('guide/modules.html')
+	res += processRawDoc('guide/logging.html')
 	res += processRawDoc('guide/finalization.html')
 	res += processRawDoc('guide/coroutines.html')
 	res += processRawDoc('guide/virtualproperties.html')
 	res += processRawDoc('guide/internalproperties.html')
-	res += processRawDoc('guide/compiling.html')
+	res += processRawDoc('guide/threading.html')
+	res += processRawDoc('guide/sandboxing.html')
 	res += processRawDoc('guide/performance.html')
+	res += processRawDoc('guide/memoryusage.html')
+	res += processRawDoc('guide/compiling.html')
 	res += processRawDoc('guide/portability.html')
 	res += processRawDoc('guide/compatibility.html')
+	res += processRawDoc('guide/versioning.html')
 	res += processRawDoc('guide/limitations.html')
 	res += processRawDoc('guide/luacomparison.html')
 
@@ -1039,7 +1085,7 @@ def main():
 	guideincdirs = [ './guide', '../examples/guide' ]
 	apiincdirs = [ './api', '../examples/api' ]
 	out_charset = 'utf-8'
-	releases_filename = '../RELEASES.txt'
+	releases_filename = '../RELEASES.rst'
 
 	duk_verstr, duk_verint = scrapeDuktapeVersion()
 	print 'Scraped version number: ' + duk_verstr
@@ -1072,19 +1118,22 @@ def main():
 
 	print 'Copying misc files'
 	for i in [ 'favicon.ico',
+	           'robots.txt',
 	           'startup_image_320x480.png',
-	           'touch_icon_114x114.png',
-	           'touch_icon_120x120.png',
-	           'touch_icon_144x144.png',
-	           'touch_icon_152x152.png',
-	           'touch_icon_57x57.png',
-	           'touch_icon_60x60.png',
-	           'touch_icon_72x72.png' ]:
-		shutil.copyfile(os.path.join('./', i), os.path.join(outdir, i))
+	           'touch-icon/touch_icon_114x114.png',
+	           'touch-icon/touch_icon_120x120.png',
+	           'touch-icon/touch_icon_144x144.png',
+	           'touch-icon/touch_icon_152x152.png',
+	           'touch-icon/touch_icon_57x57.png',
+	           'touch-icon/touch_icon_60x60.png',
+	           'touch-icon/touch_icon_72x72.png' ]:
+		shutil.copyfile(os.path.join('./', i), os.path.join(outdir, os.path.basename(i)))
 
-	print 'Copying binaries'
-	for i in os.listdir('binaries'):
-		shutil.copyfile(os.path.join('binaries', i), os.path.join(outdir, i))
+	print 'Copying release binaries'
+	for i in os.listdir(os.path.join('..', 'duktape-releases')):
+		if re.match(r'^duktape-.*?.tar.xz$', i) is None:
+			continue
+		shutil.copyfile(os.path.join('..', 'duktape-releases', i), os.path.join(outdir, i))
 
 	print 'Copying dukweb.js files'
 	for i in [ '../dukweb.js',

@@ -2,13 +2,9 @@
  *  Number built-ins
  */
 
-/* FIXME: needs to be refactored when exact parsing / string conversion
- * primitives are implemented.
- */
-
 #include "duk_internal.h"
 
-static duk_double_t duk__push_this_number_plain(duk_context *ctx) {
+DUK_LOCAL duk_double_t duk__push_this_number_plain(duk_context *ctx) {
 	duk_hobject *h;
 
 	/* Number built-in accepts a plain number or a Number object (whose
@@ -21,7 +17,7 @@ static duk_double_t duk__push_this_number_plain(duk_context *ctx) {
 		goto done;
 	}
 	h = duk_get_hobject(ctx, -1);
-	if (!h || 
+	if (!h ||
 	    (DUK_HOBJECT_GET_CLASS_NUMBER(h) != DUK_HOBJECT_CLASS_NUMBER)) {
 		DUK_DDD(DUK_DDDPRINT("unacceptable this value: %!T", (duk_tval *) duk_get_tval(ctx, -1)));
 		DUK_ERROR((duk_hthread *) ctx, DUK_ERR_TYPE_ERROR, "expected a number");
@@ -36,9 +32,12 @@ static duk_double_t duk__push_this_number_plain(duk_context *ctx) {
 	return duk_get_number(ctx, -1);
 }
 
-duk_ret_t duk_bi_number_constructor(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_constructor(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_idx_t nargs;
 	duk_hobject *h_this;
+
+	DUK_UNREF(thr);
 
 	/*
 	 *  The Number constructor uses ToNumber(arg) for number coercion
@@ -72,27 +71,27 @@ duk_ret_t duk_bi_number_constructor(duk_context *ctx) {
 	 *  (above).  String internal value is immutable.
 	 */
 
-	/* FIXME: helper */
+	/* XXX: helper */
 	duk_push_this(ctx);
 	h_this = duk_get_hobject(ctx, -1);
 	DUK_ASSERT(h_this != NULL);
 	DUK_HOBJECT_SET_CLASS_NUMBER(h_this, DUK_HOBJECT_CLASS_NUMBER);
 
-	DUK_ASSERT(h_this->prototype == ((duk_hthread *) ctx)->builtins[DUK_BIDX_NUMBER_PROTOTYPE]);
+	DUK_ASSERT(DUK_HOBJECT_GET_PROTOTYPE(thr->heap, h_this) == thr->builtins[DUK_BIDX_NUMBER_PROTOTYPE]);
 	DUK_ASSERT(DUK_HOBJECT_GET_CLASS_NUMBER(h_this) == DUK_HOBJECT_CLASS_NUMBER);
 	DUK_ASSERT(DUK_HOBJECT_HAS_EXTENSIBLE(h_this));
 
 	duk_dup(ctx, 0);  /* -> [ val obj val ] */
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
 	return 0;  /* no return value -> don't replace created value */
 }
 
-duk_ret_t duk_bi_number_prototype_value_of(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_prototype_value_of(duk_context *ctx) {
 	(void) duk__push_this_number_plain(ctx);
 	return 1;
 }
 
-duk_ret_t duk_bi_number_prototype_to_string(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_prototype_to_string(duk_context *ctx) {
 	duk_small_int_t radix;
 	duk_small_uint_t n2s_flags;
 
@@ -113,7 +112,7 @@ duk_ret_t duk_bi_number_prototype_to_string(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_number_prototype_to_locale_string(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_prototype_to_locale_string(duk_context *ctx) {
 	/* XXX: just use toString() for now; permitted although not recommended.
 	 * nargs==1, so radix is passed to toString().
 	 */
@@ -124,9 +123,9 @@ duk_ret_t duk_bi_number_prototype_to_locale_string(duk_context *ctx) {
  *  toFixed(), toExponential(), toPrecision()
  */
 
-/* FIXME: shared helper for toFixed(), toExponential(), toPrecision()? */
+/* XXX: shared helper for toFixed(), toExponential(), toPrecision()? */
 
-duk_ret_t duk_bi_number_prototype_to_fixed(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_prototype_to_fixed(duk_context *ctx) {
 	duk_small_int_t frac_digits;
 	duk_double_t d;
 	duk_small_int_t c;
@@ -159,7 +158,7 @@ duk_ret_t duk_bi_number_prototype_to_fixed(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_number_prototype_to_exponential(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_prototype_to_exponential(duk_context *ctx) {
 	duk_bool_t frac_undefined;
 	duk_small_int_t frac_digits;
 	duk_double_t d;
@@ -193,7 +192,7 @@ duk_ret_t duk_bi_number_prototype_to_exponential(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_number_prototype_to_precision(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_number_prototype_to_precision(duk_context *ctx) {
 	/* The specification has quite awkward order of coercion and
 	 * checks for toPrecision().  The operations below are a bit
 	 * reordered, within constraints of observable side effects.

@@ -9,20 +9,24 @@
  *  hex nybble table.
  */
 
-duk_uint8_t duk_lc_digits[36] = { '0', '1', '2', '3', '4', '5', '6', '7',
-                                  '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
-                                  'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-                                  'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-                                  'w', 'x', 'y', 'z' };
+DUK_INTERNAL duk_uint8_t duk_lc_digits[36] = {
+	'0', '1', '2', '3', '4', '5', '6', '7',
+	'8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+	'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+	'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+	'w', 'x', 'y', 'z'
+};
 
-duk_uint8_t duk_uc_nybbles[16] = { '0', '1', '2', '3', '4', '5', '6', '7',
-                                   '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+DUK_INTERNAL duk_uint8_t duk_uc_nybbles[16] = {
+	'0', '1', '2', '3', '4', '5', '6', '7',
+	'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+};
 
 /*
  *  Table for decoding ASCII hex digits, -1 if invalid.
  */
 
-duk_int8_t duk_hex_dectab[256] = {
+DUK_INTERNAL duk_int8_t duk_hex_dectab[256] = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  /* 0x00-0x0f */
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  /* 0x10-0x1f */
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  /* 0x20-0x2f */
@@ -40,3 +44,22 @@ duk_int8_t duk_hex_dectab[256] = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  /* 0xe0-0xef */
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1   /* 0xf0-0xff */
 };
+
+/*
+ *  Arbitrary byteswap for potentially unaligned values
+ *
+ *  Used to byteswap pointers e.g. in debugger code.
+ */
+
+DUK_INTERNAL void duk_byteswap_bytes(duk_uint8_t *p, duk_small_uint_t len) {
+	duk_uint8_t tmp;
+	duk_uint8_t *q = p + len - 1;
+
+	while (p - q < 0) {
+		tmp = *p;
+		*p = *q;
+		*q = tmp;
+		p++;
+		q--;
+	}
+}

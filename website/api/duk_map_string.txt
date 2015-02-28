@@ -31,5 +31,5 @@ string
 =seealso
 duk_decode_string
 
-=fixme
-Currently implemented.  Necessary?
+=introduced
+1.0.0

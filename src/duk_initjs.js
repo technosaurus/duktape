@@ -27,7 +27,6 @@
         def(D, name, value);
     }
 
-
     // Compatibility for 'console.log'.
     if (false) {
         console = {
@@ -37,7 +36,7 @@
         };
     }
 
-    // Duktape.info() was removed in Duktape 0.11.0, here's an example
+    // Duktape.line() was removed in Duktape 0.11.0, here's an example
     // replacement user code could use.
     if (false) {
         def(D, 'line', function () {

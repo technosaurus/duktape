@@ -3,11 +3,13 @@
  */
 
 /*===
+*** test_basic (duk_safe_call)
 length sum: 2147713027.000000
 final top: 0
+==> rc=0, result='undefined'
 ===*/
 
-void test(duk_context *ctx) {
+static duk_ret_t test_basic(duk_context *ctx) {
 	char buf[65536 + 1024];
 	duk_size_t fmt_len, i;
 	double len_sum = 0.0;
@@ -33,11 +35,16 @@ void test(duk_context *ctx) {
 	 * >>> res = 0
 	 * >>> for i in xrange(0, 65536+1):
 	 * ...   res += len( (('x' * i) + '%d') % 123 )
-	 * ... 
+	 * ...
 	 * >>> res
 	 * 2147713027
 	 */
 
 	printf("length sum: %lf\n", len_sum);
 	printf("final top: %ld\n", (long) duk_get_top(ctx));
+	return 0;
+}
+
+void test(duk_context *ctx) {
+	TEST_SAFE_CALL(test_basic);
 }

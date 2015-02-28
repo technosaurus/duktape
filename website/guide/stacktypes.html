@@ -1,19 +1,20 @@
 <h1 id="stacktypes">Stack types</h1>
 
-<p>Duktape stack types are:</p>
+<h2 id="type-table">Overview</h2>
 
 <div class="table-wrap">
 <table>
 <tr class="header"><th>Type</th><th>Type constant</th><th>Type mask constant</th><th>Description</th></tr>
-<tr><td>(none)</td><td>DUK_TYPE_NONE</td><td>DUK_TYPE_MASK_NONE</td><td>no type (missing value, invalid index, etc)</td></tr>
-<tr><td>undefined</td><td>DUK_TYPE_UNDEFINED</td><td>DUK_TYPE_MASK_UNDEFINED</td><td><code>undefined</code></td></tr>
-<tr><td>null</td><td>DUK_TYPE_NULL</td><td>DUK_TYPE_MASK_NULL</td><td><code>null</code></td></tr>
-<tr><td>boolean</td><td>DUK_TYPE_BOOLEAN</td><td>DUK_TYPE_MASK_BOOLEAN</td><td><code>true</code> and <code>false</code></td></tr>
-<tr><td>number</td><td>DUK_TYPE_NUMBER</td><td>DUK_TYPE_MASK_NUMBER</td><td>IEEE double</td></tr>
-<tr><td>string</td><td>DUK_TYPE_STRING</td><td>DUK_TYPE_MASK_STRING</td><td>immutable string</td></tr>
-<tr><td>object</td><td>DUK_TYPE_OBJECT</td><td>DUK_TYPE_MASK_OBJECT</td><td>object with properties</td></tr>
-<tr><td>buffer</td><td>DUK_TYPE_BUFFER</td><td>DUK_TYPE_MASK_BUFFER</td><td>mutable byte buffer, fixed/dynamic</td></tr>
-<tr><td>pointer</td><td>DUK_TYPE_POINTER</td><td>DUK_TYPE_MASK_POINTER</td><td>opaque pointer (void *)</td></tr>
+<tr><td><a href="#type-none">(none)</a></td><td>DUK_TYPE_NONE</td><td>DUK_TYPE_MASK_NONE</td><td>no type (missing value, invalid index, etc)</td></tr>
+<tr><td><a href="#type-undefined">undefined</a></td><td>DUK_TYPE_UNDEFINED</td><td>DUK_TYPE_MASK_UNDEFINED</td><td><code>undefined</code></td></tr>
+<tr><td><a href="#type-null">null</a></td><td>DUK_TYPE_NULL</td><td>DUK_TYPE_MASK_NULL</td><td><code>null</code></td></tr>
+<tr><td><a href="#type-boolean">boolean</a></td><td>DUK_TYPE_BOOLEAN</td><td>DUK_TYPE_MASK_BOOLEAN</td><td><code>true</code> and <code>false</code></td></tr>
+<tr><td><a href="#type-number">number</a></td><td>DUK_TYPE_NUMBER</td><td>DUK_TYPE_MASK_NUMBER</td><td>IEEE double</td></tr>
+<tr><td><a href="#type-string">string</a></td><td>DUK_TYPE_STRING</td><td>DUK_TYPE_MASK_STRING</td><td>immutable string</td></tr>
+<tr><td><a href="#type-object">object</a></td><td>DUK_TYPE_OBJECT</td><td>DUK_TYPE_MASK_OBJECT</td><td>object with properties</td></tr>
+<tr><td><a href="#type-buffer">buffer</a></td><td>DUK_TYPE_BUFFER</td><td>DUK_TYPE_MASK_BUFFER</td><td>mutable byte buffer, fixed/dynamic</td></tr>
+<tr><td><a href="#type-pointer">pointer</a></td><td>DUK_TYPE_POINTER</td><td>DUK_TYPE_MASK_POINTER</td><td>opaque pointer (void *)</td></tr>
+<tr><td><a href="#type-lightfunc">lightfunc</a></td><td>DUK_TYPE_LIGHTFUNC</td><td>DUK_TYPE_MASK_LIGHTFUNC</td><td>plain Duktape/C pointer (non-object)</td></tr>
 </table>
 </div>
 
@@ -54,16 +55,16 @@ are strings, fixed buffers, and dynamic buffers.  The data area of strings
 and fixed buffers is stable; it is safe to keep a C pointer referring to the
 data even after a Duktape/C function returns as long the string or fixed
 buffer remains reachable from a garbage collection point of view at all times.
-Note that this is not usually <i>not</i> the case for Duktape/C value stack
-arguments, for instance, unless specific arrangements are made.</p>
+Note that this is <i>not</i> the case for Duktape/C value stack arguments, for
+instance, unless specific arrangements are made.</p>
 
 <p>The data area of a dynamic buffer does <b>not</b> have a stable pointer.
 The buffer itself has a heap header with a stable address but the current
 buffer is allocated separately and potentially relocated when the buffer
 is resized.  It is thus unsafe to hold a pointer to a dynamic buffer's data
 area across a buffer resize, and it's probably best not to hold a pointer
-after a Duktape/C function returns (how would you reliably know when the
-buffer is resized?).</p>
+after a Duktape/C function returns (as there would be no easy way of being
+sure that the buffer hadn't been resized).</p>
 
 <h2 id="type-masks">Type masks</h2>
 
@@ -165,8 +166,8 @@ come out.  Don't rely on NaNs preserving their exact form.</p>
 
 <h2 id="type-string">String</h2>
 
-<p>The <b>string</b> type is a raw byte sequence of a certain length which may
-contain internal NUL (0x00) values.  Strings are always automatically NUL
+<p>The <b>string</b> type is an arbitrary byte sequence of a certain length which
+may contain internal NUL (0x00) values.  Strings are always automatically NUL
 terminated for C coding convenience.  The NUL terminator is not counted as part
 of the string length.  For instance, the string <code>"foo"</code> has byte length 3
 and is stored in memory as <code>{ 'f', 'o', 'o', '\0' }</code>.  Because of the
@@ -183,7 +184,7 @@ Strings are immutable and must NEVER be changed by calling C code.  Doing so wil
 lead to very mysterious issues which are hard to diagnose.</p>
 
 <p>Calling code most often deals with Ecmascript strings, which may contain
-arbitrary 16-bit codepoints (the whole range 0x0000 to 0xFFFF) but cannot represent
+arbitrary 16-bit codepoints (the whole range U+0000 to U+FFFF) but cannot represent
 non-<a href="http://en.wikipedia.org/wiki/Basic_Multilingual_Plane#Basic_Multilingual_Plane">BMP</a>
 codepoints (this is how strings are defined in the Ecmascript standard).
 In Duktape, Ecmascript strings are encoded with
@@ -200,32 +201,33 @@ ASCII characters as-is which is convenient for C code.  For example:</p>
     <a href="http://en.wikipedia.org/wiki/UTF-8#Invalid_code_points">invalid UTF-8</a>).</li>
 </ul>
 
-<p>Duktape also allows extended strings internally.  Codepoints up to U+10FFFF
+<a name="extended-utf8"></a>
+<p>Duktape also uses extended strings internally.  Codepoints up to U+10FFFF
 can be represented with UTF-8, and codepoints above that up to full 32 bits
 can be represented with
-<a href="http://en.wikipedia.org/wiki/UTF-8#Extending_from_31_bit_to_36_bit_range">"extended UTF-8"</a>.
+<a href="http://en.wikipedia.org/wiki/UTF-8#Extending_from_31_bit_to_36_bit_range">extended UTF-8</a>.
 Non-standard strings are used for storing internal object properties; using a
 non-standard string ensures that such properties never conflict with properties
 accessible using standard Ecmascript strings.  Non-standard strings can be given
 to Ecmascript built-in functions, but since behavior may not be exactly
 specified, results may vary.</p>
 
-<p>The "extended UTF-8" encoding used by Duktape is described in the table below.
+<p>The extended UTF-8 encoding used by Duktape is described in the table below.
 The leading byte is shown in binary (with "x" marking data bits) while
 continuation bytes are marked with "C" (indicating the bit sequence 10xxxxxx):</p>
 
 <table>
 <thead>
-<tr class="header"><th>Codepoint range</th><th>Bits</th><th>Byte sequence</th></tr>
+<tr class="header"><th>Codepoint range</th><th>Bits</th><th>Byte sequence</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td>U+0000 to U+007F</td><td>7</td><td>0xxxxxxx</td></tr>
-<tr><td>U+0080 to U+07FF</td><td>11</td><td>110xxxxx C</td></tr>
-<tr><td>U+0800 to U+FFFF</td><td>16</td><td>1110xxxx C C</td></tr>
-<tr><td>U+1 0000 to U+1F FFFF</td><td>21</td><td>11110xxx C C C</td></tr>
-<tr><td>U+20 0000 to U+3FF FFFF</td><td>26</td><td>111110xx C C C C</td></tr>
-<tr><td>U+400 0000 to U+7FFF FFFF</td><td>31</td><td>1111110x C C C C C</td></tr>
-<tr><td>U+8000 0000 to U+F FFFF FFFF</td><td>36 (32 used)</td><td>11111110 C C C C C C</td></tr>
+<tr><td>U+0000 to U+007F</td><td>7</td><td>0xxxxxxx</td><td></td></tr>
+<tr><td>U+0080 to U+07FF</td><td>11</td><td>110xxxxx C</td><td></td></tr>
+<tr><td>U+0800 to U+FFFF</td><td>16</td><td>1110xxxx C C</td><td>U+D800 to U+DFFF allowed (unlike UTF-8)</td></tr>
+<tr><td>U+1 0000 to U+1F FFFF</td><td>21</td><td>11110xxx C C C</td><td>Above U+10FFFF allowed (unlike UTF-8)</td></tr>
+<tr><td>U+20 0000 to U+3FF FFFF</td><td>26</td><td>111110xx C C C C</td><td></td></tr>
+<tr><td>U+400 0000 to U+7FFF FFFF</td><td>31</td><td>1111110x C C C C C</td><td></td></tr>
+<tr><td>U+8000 0000 to U+F FFFF FFFF</td><td>36</td><td>11111110 C C C C C C</td><td>Only 32 bits used in practice (up to U+FFFFFFFF)</td></tr>
 </tbody>
 </table>
 
@@ -287,7 +289,8 @@ ToNumber('x') = 0.  For clarity, you should only assign number values,
 e.g. <code>buf[123] = 0x78</code>.</li>
 <li>There is a fast path for reading and writing numeric indices of plain buffer
 values, e.g. <code>x = buf[123]</code> or <code>buf[123] = x</code>.  This
-fast path is not active when the base value is a Buffer object.</li>
+fast path is not active when the base value is a Buffer object (the indexes are
+readable but go through slower processing).</li>
 <li>Buffer virtual properties are not currently implemented in
 <code>defineProperty()</code>, so you can't write to buffer indices or
 buffer <code>length</code> with <code>defineProperty()</code> now (attempt
@@ -303,3 +306,39 @@ are not automatically garbage collected.  You can, however, put one or more
 pointers inside an object and use the object finalizer to free the
 native resources related to the pointer(s).</p>
 
+<h2 id="type-lightfunc">Lightfunc</h2>
+
+<p>The <b>lightfunc</b> type is a plain Duktape/C function pointer and a small
+set of control flags packed into a single tagged value which requires no further
+heap allocations.  The control flags (16 bits currently) encode:
+(1) number of stack arguments expected by the Duktape/C function (0 to 14 or
+varargs), (2) virtual <code>length</code> property value (0 to 15), and
+(3) a magic value (-128 to 127).  Because a lightfunc is a plain tagged
+value, it cannot hold any actual own property values; it has a few virtual
+properties and inherits other properties through <code>Function.prototype</code>.</p>
+
+<p>Lightfuncs are a separate tagged type in the Duktape C API, but behave mostly
+like Function objects for Ecmascript code.  They have significant limitations
+compared to ordinary Function objects, the most important being:</p>
+<ul>
+<li>Lightfuncs cannot hold own properties and have a fixed virtual <code>name</code>
+    which appears in tracebacks, etc.</li>
+<li>Lightfuncs can be used as constructor functions, but cannot have a
+    <code>prototype</code> property.  If you need to construct objects which
+    don't inherit from <code>Object.prototype</code> (the default), you need to
+    construct and return an instance explicitly in the constructor.</li>
+<li>Lightfuncs can be used as accessor properties (getters/setters), but they
+    get converted to actual functions; see
+    <a href="https://github.com/svaarala/duktape/blob/master/ecmascript-testcases/test-dev-lightfunc-accessor.js">test-dev-lightfunc-accessor.js</a>.</li>
+<li>Lightfuncs cannot have a finalizer as they are a primitive type and
+    don't have a reference count field or otherwise participate in garbage
+    collection; see
+    <a href="https://github.com/svaarala/duktape/blob/master/ecmascript-testcases/test-dev-lightfunc-finalizer.js">test-dev-lightfunc-finalizer.js</a>.</li>
+</ul>
+
+<p>Lightfuncs are useful for very low memory environments where the memory
+impact of ordinary Function objects matters.  For more discussion, see
+<a href="#duktapec-lightfunc-properties">Properties of lightweight Duktape/C functions</a>,
+<a href="#typealgorithms">Type algorithms</a>,
+and
+<a href="https://github.com/svaarala/duktape/blob/master/doc/lightweight-functions.rst">lightweight-functions.rst</a>.</p>

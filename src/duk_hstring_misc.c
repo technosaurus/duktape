@@ -4,9 +4,9 @@
 
 #include "duk_internal.h"
 
-duk_ucodepoint_t duk_hstring_char_code_at_raw(duk_hthread *thr, duk_hstring *h, duk_uint_t pos) {
+DUK_INTERNAL duk_ucodepoint_t duk_hstring_char_code_at_raw(duk_hthread *thr, duk_hstring *h, duk_uint_t pos) {
 	duk_uint32_t boff;
-	duk_uint8_t *p, *p_start, *p_end;
+	const duk_uint8_t *p, *p_start, *p_end;
 	duk_ucodepoint_t cp;
 
 	/* Caller must check character offset to be inside the string. */

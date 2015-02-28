@@ -18,8 +18,12 @@ if (duk_peval_noresult(ctx) != 0) {
 
 =tags
 compile
+protected
 
 =seealso
 duk_peval_string_noresult
 duk_peval_lstring_noresult
 duk_peval_file_noresult
+
+=introduced
+1.0.0

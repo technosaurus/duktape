@@ -11,7 +11,7 @@ limitations, and implementation limits (which are inevitable).</p>
 <p>A single Duktape heap, i.e. contexts sharing the same garbage collector,
 is <b>not re-entrant</b>.  Only one C/C++ thread can call Duktape APIs
 at a time for a particular Duktape heap (although the calling thread
-can change over time).</p>
+can change over time).  See <a href="#threading">Threading</a>.</p>
 
 <h2>String and buffer limits</h2>
 
@@ -48,19 +48,12 @@ RangeError: regexp executor recursion limit
         global input:1 preventsyield
 </pre>
 
-<h2>Regexp dollar escape</h2>
+<h2>Duktape does not fully support locales</h2>
 
-<p>The Duktape RegExp syntax allows dollar escaping (e.g. <code>/\$/</code>)
-even though it is not allowed by the E5.1 specification.  RegExp dollar
-escapes are used in existing Ecmascript code quite widely.</p>
-
-<h2>Invalid stack indices</h2>
-
-<p>The internal implementation for some stack operations (like
-<code>duk_set_top()</code> uses pointer arithmetic.  On 32-bit platforms
-the pointer arithmetic may wrap and work in unexpected ways if stack
-index values are large enough (e.g. 0x20000000 on a 32-bit platform
-with 8-byte packed value type).</p>
+<p>Although Duktape supports the concept of a local time, it doesn't support
+other locale related features such as: locale specific Date formatting,
+locale specific string comparison, locale/language specific Unicode rules
+(such as case conversion rules for Turkish, Azeri, and Lithuanian).</p>
 
 <h2>Unicode case conversion is not locale or context sensitive</h2>
 
@@ -76,6 +69,13 @@ even temporarily, the entire "array part" of an object is abandoned permanently
 and array entries are moved to the "entry part".  This involves interning all used
 array indices as explicit string keys (e.g. "0", "1", etc).  This is not a
 compliance concern, but degrades performance.</p>
+
+<h2>Array performance when writing elements using Object.defineProperty()</h2>
+
+<p>When number indexed array elements are written with <code>Object.defineProperty()</code>
+the current implementation abandons the internal "array part" which makes later
+array access much slower.  Write array elements with direct assignments such as
+<code>a[123] = 321</code> to avoid this.</p>
 
 <h2>Global/eval code is slower than function code</h2>
 

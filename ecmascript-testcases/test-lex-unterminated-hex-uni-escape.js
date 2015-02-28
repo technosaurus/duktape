@@ -1,9 +1,3 @@
-/*---
-{
-    "knownissue": "unterminated hex escapes should be parsed leniently, e.g. '\\uX' -> 'uX' but Duktape now refuses to parse them"
-}
----*/
-
 /*===
 \u
 1 u
@@ -83,4 +77,3 @@ try {
 } catch (e) {
     print(e.name);
 }
-

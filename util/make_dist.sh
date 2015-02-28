@@ -19,6 +19,18 @@
 #  example Makefiles are packaged into the dist package.
 #
 
+set -e  # exit on errors
+
+INITJS_MINIFY=closure
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--minify) INITJS_MINIFY="$2"; shift;;
+		--) shift; break;;
+		*) break;;
+	esac
+	shift
+done
+
 DIST=`pwd`/dist
 DISTSRCSEP=$DIST/src-separate
 DISTSRCCOM=$DIST/src
@@ -31,7 +43,7 @@ DUK_MINOR=`echo "$DUK_VERSION % 10000 / 100" | bc`
 DUK_PATCH=`echo "$DUK_VERSION % 100" | bc`
 DUK_VERSION_FORMATTED=$DUK_MAJOR.$DUK_MINOR.$DUK_PATCH
 GIT_COMMIT=`git rev-parse HEAD`
-GIT_DESCRIBE=`git describe`
+GIT_DESCRIBE=`git describe --always --dirty`
 
 echo "DUK_VERSION: $DUK_VERSION"
 echo "GIT_COMMIT: $GIT_COMMIT"
@@ -44,9 +56,12 @@ rm -rf $DIST
 mkdir $DIST
 mkdir $DIST/src-separate
 mkdir $DIST/src
+mkdir $DIST/extras
 mkdir $DIST/polyfills
 #mkdir $DIST/doc
 mkdir $DIST/licenses
+mkdir $DIST/debugger
+mkdir $DIST/debugger/static
 mkdir $DIST/examples
 mkdir $DIST/examples/hello
 mkdir $DIST/examples/eval
@@ -54,22 +69,27 @@ mkdir $DIST/examples/cmdline
 mkdir $DIST/examples/eventloop
 mkdir $DIST/examples/guide
 mkdir $DIST/examples/coffee
+mkdir $DIST/examples/jxpretty
+mkdir $DIST/examples/sandbox
+mkdir $DIST/examples/alloc-logging
+mkdir $DIST/examples/alloc-torture
+mkdir $DIST/examples/alloc-hybrid
+mkdir $DIST/examples/debug-trans-socket
 
 # Copy most files directly
 
 for i in \
 	duk_alloc_default.c	\
-	duk_alloc_torture.c	\
 	duk_api_internal.h	\
+	duk_api_stack.c		\
+	duk_api_heap.c		\
 	duk_api_buffer.c	\
-	duk_api.c		\
 	duk_api_call.c		\
 	duk_api_codec.c		\
 	duk_api_compile.c	\
 	duk_api_memory.c	\
 	duk_api_object.c	\
 	duk_api_string.c	\
-	duk_api_thread.c	\
 	duk_api_var.c		\
 	duk_api_logging.c	\
 	duk_api_debug.c		\
@@ -96,7 +116,6 @@ for i in \
 	duk_debug_fixedbuffer.c	\
 	duk_debug.h		\
 	duk_debug_heap.c	\
-	duk_debug_hobject.c	\
 	duk_debug_macros.c	\
 	duk_debug_vsnprintf.c	\
 	duk_error_augment.c	\
@@ -136,6 +155,8 @@ for i in \
 	duk_hthread.h		\
 	duk_hthread_misc.c	\
 	duk_hthread_stacks.c	\
+	duk_debugger.c		\
+	duk_debugger.h		\
 	duk_internal.h		\
 	duk_jmpbuf.h		\
 	duk_js_bytecode.h	\
@@ -176,25 +197,43 @@ for i in \
 done
 
 for i in \
+	README.rst \
+	Makefile \
+	package.json \
+	duk_debug.js \
+	; do
+	cp debugger/$i $DIST/debugger/
+done
+
+for i in \
+	index.html \
+	style.css \
+	webui.js \
+	; do
+	cp debugger/static/$i $DIST/debugger/static/
+done
+
+for i in \
 	console-minimal.js \
 	object-prototype-definegetter.js \
 	object-prototype-definesetter.js \
+	object-assign.js \
+	performance-now.js \
 	; do
 	cp polyfills/$i $DIST/polyfills/
 done
 
-
+cp examples/README.rst $DIST/examples/
 for i in \
-	README.txt \
-	Makefile \
+	README.rst \
 	duk_cmdline.c \
+	duk_cmdline_ajduk.c \
 	; do
 	cp examples/cmdline/$i $DIST/examples/cmdline/
 done
 
 for i in \
-	README.txt \
-	Makefile \
+	README.rst \
 	c_eventloop.c \
 	c_eventloop.js \
 	ecma_eventloop.js \
@@ -212,23 +251,21 @@ for i in \
 done
 
 for i in \
-	README.txt \
-	Makefile \
+	README.rst \
 	hello.c \
 	; do
 	cp examples/hello/$i $DIST/examples/hello/
 done
 
 for i in \
-	README.txt \
-	Makefile \
+	README.rst \
 	eval.c \
 	; do
 	cp examples/eval/$i $DIST/examples/eval/
 done
 
 for i in \
-	README.txt \
+	README.rst \
 	fib.js \
 	process.js \
 	processlines.c \
@@ -240,8 +277,7 @@ for i in \
 done
 
 for i in \
-	README.txt \
-	Makefile \
+	README.rst \
 	globals.coffee \
 	hello.coffee \
 	mandel.coffee \
@@ -250,47 +286,115 @@ for i in \
 done
 
 for i in \
-	Makefile.example \
-	Makefile.cmdline \
+	README.rst \
+	jxpretty.c \
 	; do
-	cp examples/$i $DIST/
+	cp examples/jxpretty/$i $DIST/examples/jxpretty/
 done
 
-cat README.txt.dist | sed \
+for i in \
+	README.rst \
+	sandbox.c \
+	; do
+	cp examples/sandbox/$i $DIST/examples/sandbox/
+done
+
+for i in \
+	README.rst \
+	duk_alloc_logging.c \
+	duk_alloc_logging.h \
+	log2gnuplot.py \
+	; do
+	cp examples/alloc-logging/$i $DIST/examples/alloc-logging/
+done
+
+for i in \
+	README.rst \
+	duk_alloc_torture.c \
+	duk_alloc_torture.h \
+	; do
+	cp examples/alloc-torture/$i $DIST/examples/alloc-torture/
+done
+
+for i in \
+	README.rst \
+	duk_alloc_hybrid.c \
+	duk_alloc_hybrid.h \
+	; do
+	cp examples/alloc-hybrid/$i $DIST/examples/alloc-hybrid/
+done
+
+for i in \
+	README.rst \
+	duk_debug_trans_socket.c \
+	duk_debug_trans_socket.h \
+	; do
+	cp examples/debug-trans-socket/$i $DIST/examples/debug-trans-socket/
+done
+
+cp extras/README.rst $DIST/extras/
+# XXX: copy extras
+
+for i in \
+	Makefile.cmdline \
+	Makefile.dukdebug \
+	Makefile.eventloop \
+	Makefile.hello \
+	Makefile.eval \
+	Makefile.coffee \
+	Makefile.jxpretty \
+	Makefile.sandbox \
+	mandel.js \
+	; do
+	cp dist-files/$i $DIST/
+done
+
+cat dist-files/README.rst | sed \
 	-e "s/@DUK_VERSION_FORMATTED@/$DUK_VERSION_FORMATTED/" \
 	-e "s/@GIT_COMMIT@/$GIT_COMMIT/" \
 	-e "s/@GIT_DESCRIBE@/$GIT_DESCRIBE/" \
-	> $DIST/README.txt
-cp LICENSE.txt $DIST/LICENSE.txt
-cp AUTHORS.txt $DIST/AUTHORS.txt
-cp RELEASES.txt $DIST/RELEASES.txt
+	> $DIST/README.rst
+cp LICENSE.txt $DIST/LICENSE.txt  # not strict RST so keep .txt suffix
+cp AUTHORS.rst $DIST/AUTHORS.rst
+# RELEASES.rst is only updated in master.  It's not included in the dist to
+# make maintenance fixes easier to make.
 
 for i in \
 	murmurhash2.txt \
+	commonjs.txt \
 	; do
 	cp licenses/$i $DIST/licenses/
 done
 
-# Build temp versions of LICENSE.txt and AUTHORS.txt for embedding into
+# Build temp versions of LICENSE.txt and AUTHORS.rst for embedding into
 # autogenerated C/H files.
 
 echo '/*' > $DIST/LICENSE.txt.tmp
 cat LICENSE.txt | python util/make_ascii.py | sed -e 's/^/ \*  /' >> $DIST/LICENSE.txt.tmp
 echo ' */' >> $DIST/LICENSE.txt.tmp
 
-echo '/*' > $DIST/AUTHORS.txt.tmp
-cat AUTHORS.txt | python util/make_ascii.py | sed -e 's/^/ \*  /' >> $DIST/AUTHORS.txt.tmp
-echo ' */' >> $DIST/AUTHORS.txt.tmp
+echo '/*' > $DIST/AUTHORS.rst.tmp
+cat AUTHORS.rst | python util/make_ascii.py | sed -e 's/^/ \*  /' >> $DIST/AUTHORS.rst.tmp
+echo ' */' >> $DIST/AUTHORS.rst.tmp
 
 # Build duktape.h from parts, with some git-related replacements.
-
+# The only difference between single and separate file duktape.h
+# is the internal DUK_SINGLE_FILE define.
+#
+# Newline after 'i \':
+# http://stackoverflow.com/questions/25631989/sed-insert-line-command-osx
 cat src/duktape.h.in | sed -e '
+/^@DUK_SINGLE_FILE@$/ {
+    i \
+#define DUK_SINGLE_FILE
+    d
+}
 /^@LICENSE_TXT@$/ {
     r dist/LICENSE.txt.tmp
     d
 }
-/^@AUTHORS_TXT@$/ {
-    r dist/AUTHORS.txt.tmp
+/^@AUTHORS_RST@$/ {
+    r dist/AUTHORS.rst.tmp
     d
 }
 /^@DUK_FEATURES_H@$/ {
@@ -312,6 +416,11 @@ cat src/duktape.h.in | sed -e '
 	-e "s/@DUK_VERSION_FORMATTED@/$DUK_VERSION_FORMATTED/" \
 	-e "s/@GIT_COMMIT@/$GIT_COMMIT/" \
 	-e "s/@GIT_DESCRIBE@/$GIT_DESCRIBE/" \
+	-e "s/@GIT_DESCRIBE_CSTRING@/\"$GIT_DESCRIBE\"/" \
+	> $DISTSRCCOM/duktape.h
+
+# keep the line so line numbers match between the two variant headers
+cat $DISTSRCCOM/duktape.h | sed -e 's/^#define DUK_SINGLE_FILE$//' \
 	> $DISTSRCSEP/duktape.h
 
 # Initjs code: built-in Ecmascript code snippets which are evaluated when
@@ -322,47 +431,85 @@ cat src/duktape.h.in | sed -e '
 # Closure compiler --compilation_level ADVANCED_OPTIMIZATIONS breaks some
 # of the existing code, so don't use it.
 
-#cat src/duk_initjs.js \
-#	| UglifyJS/bin/uglifyjs --ascii --no-dead-code --no-copyright \
-#	> $DISTSRCSEP/duk_initjs_uglify.js.tmp
-#if [ $? -ne 0 ]; then
-#	echo "UglifyJS initjs step failed"
-#	exit 1
-#fi
+WC_INITJS_ORIG=`wc -c < src/duk_initjs.js`
+WC_INITJS_UGLIFY=DISABLED
+WC_INITJS_UGLIFY2=DISABLED
+WC_INITJS_CLOSURE=DISABLED
 
-#UglifyJS2/bin/uglifyjs \
-#	src/duk_initjs.js \
-#	--screw-ie8 \
-#	--compress warnings=false \
-#	> $DISTSRCSEP/duk_initjs_uglify2.js.tmp
-#if [ $? -ne 0 ]; then
-#	echo "UglifyJS2 initjs step failed"
-#	exit 1
-#fi
+minify_uglifyjs() {
+	cat src/duk_initjs.js \
+		| UglifyJS/bin/uglifyjs --ascii --no-dead-code --no-copyright \
+		> $DISTSRCSEP/duk_initjs_uglify.js.tmp
+	if [ $? -ne 0 ]; then
+		echo "UglifyJS initjs step failed"
+		exit 1
+	fi
+	WC_INITJS_UGLIFY=`wc -c < $DISTSRCSEP/duk_initjs_uglify.js.tmp`
+}
 
-java -jar compiler.jar \
-	--warning_level QUIET \
-	--language_in ECMASCRIPT5 \
-	--compilation_level SIMPLE_OPTIMIZATIONS \
-	src/duk_initjs.js \
-	> $DISTSRCSEP/duk_initjs_closure.js.tmp
-if [ $? -ne 0 ]; then
-	echo "Closure initjs step failed"
-	exit 1
-fi
+minify_uglifyjs2() {
+	UglifyJS2/bin/uglifyjs \
+		src/duk_initjs.js \
+		--screw-ie8 \
+		--compress warnings=false \
+		> $DISTSRCSEP/duk_initjs_uglify2.js.tmp
+	if [ $? -ne 0 ]; then
+		echo "UglifyJS2 initjs step failed"
+		exit 1
+	fi
+	WC_INITJS_UGLIFY2=`wc -c < $DISTSRCSEP/duk_initjs_uglify2.js.tmp`
+}
 
-INITJS_ORIG=`wc -c < src/duk_initjs.js`
-INITJS_UGLIFY=DISABLED
-INITJS_UGLIFY2=DISABLED
-#INITJS_UGLIFY=`wc -c < $DISTSRCSEP/duk_initjs_uglify.js.tmp`
-#INITJS_UGLIFY2=`wc -c < $DISTSRCSEP/duk_initjs_uglify2.js.tmp`
-INITJS_CLOSURE=`wc -c < $DISTSRCSEP/duk_initjs_closure.js.tmp`
-echo "Minified initjs size: original=$INITJS_ORIG, UglifyJS=$INITJS_UGLIFY, UglifyJS2=$INITJS_UGLIFY2, closure=$INITJS_CLOSURE"
+minify_closure() {
+	java -jar compiler.jar \
+		--warning_level QUIET \
+		--language_in ECMASCRIPT5 \
+		--compilation_level SIMPLE_OPTIMIZATIONS \
+		src/duk_initjs.js \
+		> $DISTSRCSEP/duk_initjs_closure.js.tmp
+	if [ $? -ne 0 ]; then
+		echo "Closure initjs step failed"
+		exit 1
+	fi
+	WC_INITJS_CLOSURE=`wc -c < $DISTSRCSEP/duk_initjs_closure.js.tmp`
+}
 
-# choose which minifier to use
-#echo "Using UglifyJS minified version"; cp $DISTSRCSEP/duk_initjs_uglify.js.tmp $DISTSRCSEP/duk_initjs_min.js
-#echo "Using UglifyJS2 minified version"; cp $DISTSRCSEP/duk_initjs_uglify2.js.tmp $DISTSRCSEP/duk_initjs_min.js
-echo "Using closure minified version"; cp $DISTSRCSEP/duk_initjs_closure.js.tmp $DISTSRCSEP/duk_initjs_min.js
+minify_none() {
+	cp src/duk_initjs.js $DISTSRCSEP/duk_initjs_none.js.tmp
+}
+
+case "$INITJS_MINIFY" in
+	all)
+		# useful for printing out comparison, uses closure version
+		minify_uglifyjs
+		minify_uglifyjs2
+		minify_closure
+		echo "Using closure minified version"
+		cp $DISTSRCSEP/duk_initjs_closure.js.tmp $DISTSRCSEP/duk_initjs_min.js
+		;;
+	uglifyjs)
+		minify_uglifyjs
+		echo "Using UglifyJS minified version"
+		cp $DISTSRCSEP/duk_initjs_uglify.js.tmp $DISTSRCSEP/duk_initjs_min.js
+		;;
+	uglifyjs2)
+		minify_uglifyjs2
+		echo "Using UglifyJS2 minified version"
+		cp $DISTSRCSEP/duk_initjs_uglify2.js.tmp $DISTSRCSEP/duk_initjs_min.js
+		;;
+	closure)
+		minify_closure
+		echo "Using closure minified version"
+		cp $DISTSRCSEP/duk_initjs_closure.js.tmp $DISTSRCSEP/duk_initjs_min.js
+		;;
+	*)
+		minify_none
+		echo "Using un-minified version"
+		cp $DISTSRCSEP/duk_initjs_none.js.tmp $DISTSRCSEP/duk_initjs_min.js
+		;;
+esac
+
+echo "Minified initjs size: original=$WC_INITJS_ORIG, UglifyJS=$WC_INITJS_UGLIFY, UglifyJS2=$WC_INITJS_UGLIFY2, closure=$WC_INITJS_CLOSURE"
 
 # Autogenerated strings and built-in files
 #
@@ -371,6 +518,7 @@ echo "Using closure minified version"; cp $DISTSRCSEP/duk_initjs_closure.js.tmp 
 
 python src/genbuildparams.py \
 	--version=$DUK_VERSION \
+	"--git-describe=$GIT_DESCRIBE" \
 	--out-json=$DISTSRCSEP/buildparams.json.tmp \
 	--out-header=$DISTSRCSEP/duk_buildparams.h.tmp
 
@@ -379,12 +527,20 @@ python src/genbuiltins.py \
 	--initjs-data=$DISTSRCSEP/duk_initjs_min.js \
 	--out-header=$DISTSRCSEP/duk_builtins.h \
 	--out-source=$DISTSRCSEP/duk_builtins.c \
+	--out-metadata-json=$DIST/duk_build_meta.json
 
 # Autogenerated Unicode files
 #
 # Note: not all of the generated headers are used.  For instance, the
 # match table for "WhiteSpace-Z" is not used, because a custom piece
 # of code handles that particular match.
+#
+# UnicodeData.txt contains ranges expressed like this:
+#
+#   4E00;<CJK Ideograph, First>;Lo;0;L;;;;;N;;;;;
+#   9FCB;<CJK Ideograph, Last>;Lo;0;L;;;;;N;;;;;
+#
+# These are currently decoded into individual characters as a prestep.
 #
 # For IDPART:
 #   UnicodeCombiningMark -> categories Mn, Mc
@@ -432,9 +588,11 @@ IDPART_MINUS_IDSTART_NOA_EXCL='Lu,Ll,Lt,Lm,Lo,Nl,0024,005F,ASCII'
 IDPART_MINUS_IDSTART_NOABMP_INCL=$IDPART_MINUS_IDSTART_NOA_INCL
 IDPART_MINUS_IDSTART_NOABMP_EXCL='Lu,Ll,Lt,Lm,Lo,Nl,0024,005F,ASCII,NONBMP'
 
+python src/prepare_unicode_data.py src/UnicodeData.txt $DISTSRCSEP/UnicodeData-expanded.tmp
+
 extract_chars() {
 	python src/extract_chars.py \
-		--unicode-data=src/UnicodeData.txt \
+		--unicode-data=$DISTSRCSEP/UnicodeData-expanded.tmp \
 		--include-categories="$1" \
 		--exclude-categories="$2" \
 		--out-source=$DISTSRCSEP/duk_unicode_$3.c.tmp \
@@ -445,7 +603,7 @@ extract_chars() {
 
 extract_caseconv() {
 	python src/extract_caseconv.py \
-		--unicode-data=src/UnicodeData.txt \
+		--unicode-data=$DISTSRCSEP/UnicodeData-expanded.tmp \
 		--special-casing=src/SpecialCasing.txt \
 		--out-source=$DISTSRCSEP/duk_unicode_caseconv.c.tmp \
 		--out-header=$DISTSRCSEP/duk_unicode_caseconv.h.tmp \
@@ -571,12 +729,12 @@ rm $DISTSRCSEP/caseconv.txt
 
 python util/combine_src.py $DISTSRCSEP $DISTSRCCOM/duktape.c \
 	"$DUK_VERSION" "$GIT_COMMIT" "$GIT_DESCRIBE" \
-	$DIST/LICENSE.txt.tmp $DIST/AUTHORS.txt.tmp
+	$DIST/LICENSE.txt.tmp $DIST/AUTHORS.rst.tmp
 echo "CLOC report on combined duktape.c source file"
 perl cloc-1.60.pl --quiet $DISTSRCCOM/duktape.c
 
-cp $DISTSRCSEP/duktape.h $DISTSRCCOM/duktape.h
-
-# Clean up remaining files
-
+# Clean up temp files
 rm $DIST/*.tmp
+
+# Create SPDX license once all other files are in place (and cleaned)
+python util/create_spdx_license.py `pwd`/dist/license.spdx

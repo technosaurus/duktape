@@ -4,8 +4,7 @@
 
 /*---
 {
-    "nonstandard": true,
-    "knownissue": "non-standard octal behavior does not match V8/Rhino"
+    "nonstandard": true
 }
 ---*/
 
@@ -44,7 +43,7 @@ radix 8
  * (at least for now).
  */
 
-/* FIXME: change Duktape behavior to match V8 and Rhino for octal? */
+/* XXX: change Duktape behavior to match V8 and Rhino for octal? */
 
 print('radix 8');
 
@@ -81,5 +80,3 @@ try {
 } catch (e) {
     print(e.name);
 }
-
-

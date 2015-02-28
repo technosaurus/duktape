@@ -1,9 +1,3 @@
-/*---
-{
-    "knownissue": "in a denormal corner case toPrecision() can output a zero leading digit"
-}
----*/
-
 /*===
 1e-323
 9.8813129168249308835e-324
@@ -29,4 +23,3 @@ try {
 } catch (e) {
     print(e);
 }
-

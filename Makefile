@@ -8,6 +8,12 @@
 #    - running test cases
 #    - building the duktape.org website
 #
+#  The Makefile now also works in a very limited fashion with Cygwin,
+#  you can 'make dist' as long as you have enough software installed.
+#  The closure compiler requires a working JDK installation (JRE is
+#  not enough, JAVA_HOME must point to the JDK), and a working Apache
+#  'ant' command.
+#
 #  The source distributable has more platform neutral example Makefiles
 #  for end user projects (though an end user should really just use their
 #  own Makefile).
@@ -33,23 +39,24 @@
 # A few commands which may need to be edited.  NodeJS is sometimes found
 # as 'nodejs', sometimes as 'node'; sometimes 'node' is unrelated to NodeJS
 # so check 'nodejs' first.
-GIT=$(shell which git)
-NODE=$(shell which nodejs node | head -1)
-WGET=$(shell which wget)
-JAVA=$(shell which java)
-VALGRIND=$(shell which valgrind)
-PYTHON=$(shell which python)
+GIT:=$(shell which git)
+NODE:=$(shell which nodejs node | head -1)
+WGET:=$(shell which wget)
+JAVA:=$(shell which java)
+VALGRIND:=$(shell which valgrind)
+PYTHON:=$(shell which python)
 
 # Scrape version from the public header; convert from e.g. 10203 -> '1.2.3'
-DUK_VERSION=$(shell cat src/duk_api_public.h.in | grep define | grep DUK_VERSION | tr -s ' ' ' ' | cut -d ' ' -f 3 | tr -d 'L')
-DUK_MAJOR=$(shell echo "$(DUK_VERSION) / 10000" | bc)
-DUK_MINOR=$(shell echo "$(DUK_VERSION) % 10000 / 100" | bc)
-DUK_PATCH=$(shell echo "$(DUK_VERSION) % 100" | bc)
-DUK_VERSION_FORMATTED=$(DUK_MAJOR).$(DUK_MINOR).$(DUK_PATCH)
-GIT_DESCRIBE=$(shell git describe)
+DUK_VERSION:=$(shell cat src/duk_api_public.h.in | grep define | grep DUK_VERSION | tr -s ' ' ' ' | cut -d ' ' -f 3 | tr -d 'L')
+DUK_MAJOR:=$(shell echo "$(DUK_VERSION) / 10000" | bc)
+DUK_MINOR:=$(shell echo "$(DUK_VERSION) % 10000 / 100" | bc)
+DUK_PATCH:=$(shell echo "$(DUK_VERSION) % 100" | bc)
+DUK_VERSION_FORMATTED:=$(DUK_MAJOR).$(DUK_MINOR).$(DUK_PATCH)
+GIT_DESCRIBE:=$(shell git describe --always --dirty)
+BUILD_DATETIME:=$(shell date +%Y%m%d%H%M%S)
 
 # Ditz release (next release name)
-DITZ_RELEASE=v0.12
+DITZ_RELEASE=v1.2
 
 DISTSRCSEP = dist/src-separate
 DISTSRCCOM = dist/src
@@ -69,7 +76,6 @@ DUKTAPE_SOURCES_SEPARATE =	\
 	$(DISTSRCSEP)/duk_debug_macros.c \
 	$(DISTSRCSEP)/duk_debug_vsnprintf.c \
 	$(DISTSRCSEP)/duk_debug_heap.c \
-	$(DISTSRCSEP)/duk_debug_hobject.c \
 	$(DISTSRCSEP)/duk_debug_fixedbuffer.c \
 	$(DISTSRCSEP)/duk_error_macros.c \
 	$(DISTSRCSEP)/duk_error_longjmp.c \
@@ -100,22 +106,23 @@ DUKTAPE_SOURCES_SEPARATE =	\
 	$(DISTSRCSEP)/duk_hbuffer_ops.c \
 	$(DISTSRCSEP)/duk_unicode_tables.c \
 	$(DISTSRCSEP)/duk_unicode_support.c \
+	$(DISTSRCSEP)/duk_debugger.c \
 	$(DISTSRCSEP)/duk_builtins.c \
 	$(DISTSRCSEP)/duk_js_ops.c \
 	$(DISTSRCSEP)/duk_js_var.c \
 	$(DISTSRCSEP)/duk_numconv.c \
+	$(DISTSRCSEP)/duk_api_stack.c \
+	$(DISTSRCSEP)/duk_api_heap.c \
 	$(DISTSRCSEP)/duk_api_call.c \
 	$(DISTSRCSEP)/duk_api_compile.c \
 	$(DISTSRCSEP)/duk_api_codec.c \
 	$(DISTSRCSEP)/duk_api_memory.c \
 	$(DISTSRCSEP)/duk_api_string.c \
 	$(DISTSRCSEP)/duk_api_object.c \
-	$(DISTSRCSEP)/duk_api_thread.c \
 	$(DISTSRCSEP)/duk_api_buffer.c \
 	$(DISTSRCSEP)/duk_api_var.c \
 	$(DISTSRCSEP)/duk_api_logging.c \
 	$(DISTSRCSEP)/duk_api_debug.c \
-	$(DISTSRCSEP)/duk_api.c \
 	$(DISTSRCSEP)/duk_lexer.c \
 	$(DISTSRCSEP)/duk_js_call.c \
 	$(DISTSRCSEP)/duk_js_executor.c \
@@ -151,69 +158,117 @@ DUKTAPE_SOURCES = $(DUKTAPE_SOURCES_COMBINED)
 # Duktape command line tool - example of a main() program, used
 # for unit testing
 DUKTAPE_CMDLINE_SOURCES = \
-	$(DISTCMD)/duk_cmdline.c
+	$(DISTCMD)/duk_cmdline.c \
+	dist/examples/alloc-logging/duk_alloc_logging.c \
+	dist/examples/alloc-torture/duk_alloc_torture.c \
+	dist/examples/alloc-hybrid/duk_alloc_hybrid.c \
+	dist/examples/debug-trans-socket/duk_debug_trans_socket.c
 
 # Compiler setup for Linux
 CC	= gcc
+GXX	= g++
+
+CCOPTS_FEATURES =
+#CCOPTS_FEATURES += -DDUK_OPT_NO_PACKED_TVAL
+#CCOPTS_FEATURES += -DDUK_OPT_FORCE_ALIGN=4
+#CCOPTS_FEATURES += -DDUK_OPT_FORCE_ALIGN=8
+#CCOPTS_FEATURES += -DDUK_OPT_FORCE_BYTEORDER=1      # little
+#CCOPTS_FEATURES += -DDUK_OPT_FORCE_BYTEORDER=2      # middle
+#CCOPTS_FEATURES += -DDUK_OPT_FORCE_BYTEORDER=3      # big
+#CCOPTS_FEATURES += -DDUK_OPT_DEEP_C_STACK
+#CCOPTS_FEATURES += -DDUK_OPT_NO_REFERENCE_COUNTING
+#CCOPTS_FEATURES += -DDUK_OPT_NO_MARK_AND_SWEEP
+#CCOPTS_FEATURES += -DDUK_OPT_NO_VOLUNTARY_GC
+CCOPTS_FEATURES += -DDUK_OPT_SEGFAULT_ON_PANIC       # segfault on panic allows valgrind to show stack trace on panic
+CCOPTS_FEATURES += -DDUK_OPT_DPRINT_COLORS
+#CCOPTS_FEATURES += -DDUK_OPT_NO_FILE_IO
+#CCOPTS_FEATURES += '-DDUK_OPT_PANIC_HANDLER(code,msg)={printf("*** %d:%s\n",(code),(msg));abort();}'
+CCOPTS_FEATURES += -DDUK_OPT_SELF_TESTS
+#CCOPTS_FEATURES += -DDUK_OPT_NO_TRACEBACKS
+#CCOPTS_FEATURES += -DDUK_OPT_NO_PC2LINE
+#CCOPTS_FEATURES += -DDUK_OPT_NO_VERBOSE_ERRORS
+#CCOPTS_FEATURES += -DDUK_OPT_GC_TORTURE
+#CCOPTS_FEATURES += -DDUK_OPT_NO_MS_RESIZE_STRINGTABLE
+CCOPTS_FEATURES += -DDUK_OPT_DEBUG_BUFSIZE=512
+#CCOPTS_FEATURES += -DDUK_OPT_NO_STRICT_DECL
+#CCOPTS_FEATURES += -DDUK_OPT_NO_REGEXP_SUPPORT
+#CCOPTS_FEATURES += -DDUK_OPT_NO_OCTAL_SUPPORT
+#CCOPTS_FEATURES += -DDUK_OPT_NO_SOURCE_NONBMP
+#CCOPTS_FEATURES += -DDUK_OPT_STRICT_UTF8_SOURCE
+#CCOPTS_FEATURES += -DDUK_OPT_NO_BROWSER_LIKE
+#CCOPTS_FEATURES += -DDUK_OPT_NO_SECTION_B
+CCOPTS_FEATURES += -DDUK_OPT_INTERRUPT_COUNTER
+CCOPTS_FEATURES += -DDUK_OPT_DEBUGGER_SUPPORT
+CCOPTS_FEATURES += -DDUK_OPT_DEBUGGER_FWD_PRINTALERT
+CCOPTS_FEATURES += -DDUK_OPT_DEBUGGER_FWD_LOGGING
+CCOPTS_FEATURES += -DDUK_OPT_DEBUGGER_DUMPHEAP
+CCOPTS_FEATURES += -DDUK_OPT_TARGET_INFO='"duk command built from Duktape repo"'
+#CCOPTS_FEATURES += -DDUK_OPT_NO_JX
+#CCOPTS_FEATURES += -DDUK_OPT_NO_JC
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_ACCESSOR_KEY_ARGUMENT
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_FUNC_STMT
+#CCOPTS_FEATURES += -DDUK_OPT_NONSTD_FUNC_CALLER_PROPERTY
+#CCOPTS_FEATURES += -DDUK_OPT_NONSTD_FUNC_SOURCE_PROPERTY
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_ARRAY_SPLICE_DELCOUNT
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_ARRAY_CONCAT_TRAILER
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_ARRAY_MAP_TRAILER
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_JSON_ESC_U2028_U2029
+#CCOPTS_FEATURES += -DDUK_OPT_NO_NONSTD_STRING_FROMCHARCODE_32BIT
+#CCOPTS_FEATURES += -DDUK_OPT_NO_ES6_OBJECT_PROTO_PROPERTY
+#CCOPTS_FEATURES += -DDUK_OPT_NO_ES6_OBJECT_SETPROTOTYPEOF
+#CCOPTS_FEATURES += -DDUK_OPT_NO_ES6_PROXY
+#CCOPTS_FEATURES += -DDUK_OPT_NO_ZERO_BUFFER_DATA
+#CCOPTS_FEATURES += -DDUK_OPT_USER_INITJS='"this.foo = 123"'
+#CCOPTS_FEATURES += -DDUK_OPT_SETJMP
+#CCOPTS_FEATURES += -DDUK_OPT_UNDERSCORE_SETJMP
+#CCOPTS_FEATURES += -DDUK_OPT_SIGSETJMP
+#CCOPTS_FEATURES += -DDUK_OPT_LIGHTFUNC_BUILTINS
+#CCOPTS_FEATURES += -DDUK_OPT_REFCOUNT16
+#CCOPTS_FEATURES += -DDUK_OPT_STRHASH16
+#CCOPTS_FEATURES += -DDUK_OPT_STRLEN16
+#CCOPTS_FEATURES += -DDUK_OPT_BUFLEN16
+#CCOPTS_FEATURES += -DDUK_OPT_OBJSIZES16
+#CCOPTS_FEATURES += -DDUK_OPT_STRTAB_CHAIN
+#CCOPTS_FEATURES += -DDUK_OPT_STRTAB_CHAIN_SIZE=128
+#CCOPTS_FEATURES += -DDUK_OPT_HEAPPTR16
+#CCOPTS_FEATURES += '-DDUK_OPT_HEAPPTR_ENC16(ud,p)=XXX'
+#CCOPTS_FEATURES += '-DDUK_OPT_HEAPPTR_DEC16(ud,x)=XXX'
+#CCOPTS_FEATURES += '-DDUK_OPT_DECLARE=XXX'
+CCOPTS_FEATURES += -DDUK_CMDLINE_FANCY
+CCOPTS_FEATURES += -DDUK_CMDLINE_ALLOC_LOGGING
+CCOPTS_FEATURES += -DDUK_CMDLINE_ALLOC_TORTURE
+CCOPTS_FEATURES += -DDUK_CMDLINE_ALLOC_HYBRID
+CCOPTS_FEATURES += -DDUK_CMDLINE_DEBUGGER_SUPPORT
+
 CCOPTS_SHARED =
-CCOPTS_SHARED += -pedantic -ansi -std=c99
-CCOPTS_SHARED += -fstrict-aliasing
-CCOPTS_SHARED += -Wall
-CCOPTS_SHARED += -Wextra  # very picky but catches e.g. signed/unsigned comparisons
-CCOPTS_SHARED += -I./dist/src
+CCOPTS_SHARED += -pedantic -ansi -std=c99 -fstrict-aliasing
+# -Wextra is very picky but catches e.g. signed/unsigned comparisons
+CCOPTS_SHARED += -Wall -Wextra -Wunused-result
+CCOPTS_SHARED += -I./dist/src -I./dist/examples/alloc-logging -I./dist/examples/alloc-torture -I./dist/examples/alloc-hybrid -I./dist/examples/debug-trans-socket
 #CCOPTS_SHARED += -I./dist/src-separate
 #CCOPTS_SHARED += -m32                             # force 32-bit compilation on a 64-bit host
 #CCOPTS_SHARED += -mx32                            # force X32 compilation on a 64-bit host
-#CCOPTS_SHARED += -DDUK_OPT_NO_PACKED_TVAL
-#CCOPTS_SHARED += -DDUK_OPT_FORCE_ALIGN=4
-#CCOPTS_SHARED += -DDUK_OPT_FORCE_ALIGN=8
-#CCOPTS_SHARED += -DDUK_OPT_FORCE_BYTEORDER=1      # little
-#CCOPTS_SHARED += -DDUK_OPT_FORCE_BYTEORDER=2      # middle
-#CCOPTS_SHARED += -DDUK_OPT_FORCE_BYTEORDER=3      # big
-#CCOPTS_SHARED += -DDUK_OPT_DEEP_C_STACK
-#CCOPTS_SHARED += -DDUK_OPT_NO_REFERENCE_COUNTING
-#CCOPTS_SHARED += -DDUK_OPT_NO_MARK_AND_SWEEP
-#CCOPTS_SHARED += -DDUK_OPT_NO_VOLUNTARY_GC
-CCOPTS_SHARED += -DDUK_OPT_SEGFAULT_ON_PANIC       # segfault on panic allows valgrind to show stack trace on panic
-CCOPTS_SHARED += -DDUK_OPT_DPRINT_COLORS
-#CCOPTS_SHARED += -DDUK_OPT_NO_FILE_IO
-#CCOPTS_SHARED += '-DDUK_OPT_PANIC_HANDLER(code,msg)={printf("*** %d:%s\n",(code),(msg));abort();}'
-CCOPTS_SHARED += -DDUK_OPT_SELF_TESTS
-#CCOPTS_SHARED += -DDUK_OPT_NO_TRACEBACKS
-#CCOPTS_SHARED += -DDUK_OPT_NO_PC2LINE
-#CCOPTS_SHARED += -DDUK_OPT_NO_VERBOSE_ERRORS
-#CCOPTS_SHARED += -DDUK_OPT_GC_TORTURE
-#CCOPTS_SHARED += -DDUK_OPT_NO_MS_RESIZE_STRINGTABLE
-CCOPTS_SHARED += -DDUK_OPT_DEBUG_BUFSIZE=512
-#CCOPTS_SHARED += -DDUK_OPT_NO_REGEXP_SUPPORT
-#CCOPTS_SHARED += -DDUK_OPT_NO_OCTAL_SUPPORT
-#CCOPTS_SHARED += -DDUK_OPT_NO_SOURCE_NONBMP
-#CCOPTS_SHARED += -DDUK_OPT_STRICT_UTF8_SOURCE
-#CCOPTS_SHARED += -DDUK_OPT_NO_BROWSER_LIKE
-#CCOPTS_SHARED += -DDUK_OPT_NO_SECTION_B
-#CCOPTS_SHARED += -DDUK_OPT_NO_INTERRUPT_COUNTER
-#CCOPTS_SHARED += -DDUK_OPT_NO_JX
-#CCOPTS_SHARED += -DDUK_OPT_NO_JC
-#CCOPTS_SHARED += -DDUK_OPT_NO_NONSTD_ACCESSOR_KEY_ARGUMENT
-#CCOPTS_SHARED += -DDUK_OPT_NO_NONSTD_FUNC_STMT
-#CCOPTS_SHARED += -DDUK_OPT_NONSTD_FUNC_CALLER_PROPERTY
-#CCOPTS_SHARED += -DDUK_OPT_NONSTD_FUNC_SOURCE_PROPERTY
-#CCOPTS_SHARED += -DDUK_OPT_NO_NONSTD_ARRAY_SPLICE_DELCOUNT
-#CCOPTS_SHARED += -DDUK_OPT_NO_ES6_OBJECT_PROTO_PROPERTY
-#CCOPTS_SHARED += -DDUK_OPT_NO_ES6_OBJECT_SETPROTOTYPEOF
-#CCOPTS_SHARED += -DDUK_OPT_NO_ES6_PROXY
-#CCOPTS_SHARED += -DDUK_OPT_NO_ZERO_BUFFER_DATA
-#CCOPTS_SHARED += -DDUK_OPT_USER_INITJS='"this.foo = 123"'
-#CCOPTS_SHARED += -DDUK_CMDLINE_BAREBONES
-CCOPTS_NONDEBUG = $(CCOPTS_SHARED) -Os -fomit-frame-pointer
-CCOPTS_NONDEBUG += -g -ggdb
+
+CCOPTS_NONDEBUG = $(CCOPTS_SHARED) $(CCOPTS_FEATURES)
+CCOPTS_NONDEBUG += -Os -fomit-frame-pointer -g -ggdb
 #CCOPTS_NONDEBUG += -DDUK_OPT_ASSERTIONS
-CCOPTS_DEBUG = $(CCOPTS_SHARED) -O0 -g -ggdb
+
+CCOPTS_DEBUG = $(CCOPTS_SHARED) $(CCOPTS_FEATURES)
+CCOPTS_DEBUG += -O0 -g -ggdb
 CCOPTS_DEBUG += -DDUK_OPT_DEBUG
 CCOPTS_DEBUG += -DDUK_OPT_DPRINT
 #CCOPTS_DEBUG += -DDUK_OPT_DDPRINT
 #CCOPTS_DEBUG += -DDUK_OPT_DDDPRINT
 CCOPTS_DEBUG += -DDUK_OPT_ASSERTIONS
+
+GXXOPTS_NONDEBUG = -pedantic -ansi -std=c++11 -fstrict-aliasing -Wall -Wextra -Wunused-result -Os -fomit-frame-pointer
+GXXOPTS_NONDEBUG += -I./dist/src -I./dist/examples/alloc-logging -I./dist/examples/alloc-torture -I./dist/examples/alloc-hybrid
+GXXOPTS_NONDEBUG += -DDUK_OPT_DEBUGGER_SUPPORT -DDUK_OPT_INTERRUPT_COUNTER
+GXXOPTS_DEBUG = -pedantic -ansi -std=c++11 -fstrict-aliasing -Wall -Wextra -Wunused-result -O0 -g -ggdb
+GXXOPTS_DEBUG += -I./dist/src -I./dist/examples/alloc-logging -I./dist/examples/alloc-torture -I./dist/examples/alloc-hybrid
+GXXOPTS_DEBUG += -DDUK_OPT_DEBUG -DDUK_OPT_DPRINT -DDUK_OPT_ASSERTIONS -DDUK_OPT_SELF_TESTS
+#GXXOPTS_DEBUG += -DDUK_OPT_DDPRINT -DDUK_OPT_DDDPRINT
+
 CCLIBS	= -lm
 CCLIBS += -lreadline
 CCLIBS += -lncurses  # on some systems -lreadline also requires -lncurses (e.g. RHEL)
@@ -233,86 +288,108 @@ checksetup:
 
 .PHONY:	clean
 clean:
-	-@rm -rf dist/
-	-@rm -rf site/
-	-@rm -f duk.raw dukd.raw duk.vg dukd.vg duk dukd
-	-@rm -f libduktape*.so*
-	-@rm -f doc/*.html
-	-@rm -f src/*.pyc
-	-@rm -rf duktape-*  # covers various files and dirs
-	-@rm -rf massif.out.* ms_print.tmp.*
-	-@rm -rf cachegrind.out.*
-	-@rm -rf callgrind.out.*
-	-@rm -rf oprofile_data/
-	-@rm -f /tmp/duk_sizes.html
-	-@rm -f /tmp/duk-test-eval-file-temp.js  # used by api-testcase/test-eval-file.js
-	-@rm -rf /tmp/duktape-regfuzz/
-	-@rm -f /tmp/duk-test.log /tmp/duk-api-test.log
-	-@rm -f /tmp/duk-test262.log /tmp/duk-test262-filtered.log
-	-@rm -f /tmp/duk-emcc-test*
-	-@rm -f /tmp/duk-emcc-luatest*
-	-@rm -f /tmp/duk-emcc-duktest*
-	-@rm -f /tmp/duk-jsint-test*
-	-@rm -f /tmp/duk-luajs-mandel.js /tmp/duk-luajs-test.js
-	-@rm -f /tmp/duk-closure-test*
-	-@rm -f a.out
-	-@rm -rf test262-d067d2f0ca30
-	-@rm -f compiler.jar
-	-@rm -rf lua-5.2.3
-	-@rm -rf luajs
-	-@rm -f dukweb.js
-	-@rm -rf /tmp/dukweb-test/
+	@rm -rf dist/
+	@rm -rf site/
+	@rm -f duk.raw dukd.raw duk.vg dukd.vg duk dukd
+	@rm -f duk-g++ dukd-g++
+	@rm -f ajduk ajdukd
+	@rm -f libduktape*.so*
+	@rm -f duktape-*.tar.*
+	@rm -f duktape-*.iso
+	@rm -f doc/*.html
+	@rm -f src/*.pyc
+	@rm -rf massif.out.* ms_print.tmp.*
+	@rm -rf cachegrind.out.*
+	@rm -rf callgrind.out.*
+	@rm -rf oprofile_data/
+	@rm -f /tmp/duk_sizes.html
+	@rm -f /tmp/duk-test-eval-file-temp.js  # used by api-testcase/test-eval-file.js
+	@rm -rf /tmp/duktape-regfuzz/
+	@rm -f /tmp/duk-test.log /tmp/duk-api-test.log
+	@rm -f /tmp/duk-test262.log /tmp/duk-test262-filtered.log
+	@rm -f /tmp/duk-emcc-test*
+	@rm -f /tmp/duk-emcc-luatest*
+	@rm -f /tmp/duk-emcc-duktest*
+	@rm -f /tmp/duk-jsint-test*
+	@rm -f /tmp/duk-luajs-mandel.js /tmp/duk-luajs-test.js
+	@rm -f /tmp/duk-closure-test*
+	@rm -f /tmp/duk-bluebird-test*
+	@rm -f a.out
+	@rm -rf test262-*
+	@rm -f compiler.jar
+	@rm -rf lua-5.2.3
+	@rm -rf luajs
+	@rm -f dukweb.js
+	@rm -rf /tmp/dukweb-test/
+	@rm -f massif-*.out
 
 .PHONY: cleanall
 cleanall: clean
 	# Don't delete these in 'clean' to avoid re-downloading them over and over
-	-@rm -f regfuzz-*.tar.gz
-	-@rm -rf UglifyJS
-	-@rm -rf UglifyJS2
-	-@rm -rf underscore
-	-@rm -f d067d2f0ca30.tar.bz2
-	-@rm -rf emscripten
-	-@rm -rf JS-Interpreter
-	-@rm -f compiler-latest.zip
-	-@rm -f cloc-1.60.pl
-	-@rm -f lua-5.2.3.tar.gz
-	-@rm -f luajs.zip
-	-@rm -f jquery-1.11.0.js
-	-@rm -rf coffee-script
-	-@rm -rf LiveScript
-	-@rm -rf coco
-	-@rm -rf sax-js
-	-@rm -rf xmldoc
-	-@rm -rf FlameGraph
-	-@rm -rf dtrace4linux
+	@rm -rf duktape-releases
+	@rm -f regfuzz-*.tar.gz
+	@rm -rf UglifyJS
+	@rm -rf UglifyJS2
+	@rm -rf closure-compiler
+	@rm -rf underscore
+	@rm -f d067d2f0ca30.tar.bz2
+	@rm -rf emscripten
+	@rm -rf JS-Interpreter
+	@rm -f compiler-latest.zip
+	@rm -f cloc-1.60.pl
+	@rm -f lua-5.2.3.tar.gz
+	@rm -f luajs.zip
+	@rm -f bluebird.js
+	@rm -f jquery-1.11.0.js
+	@rm -rf coffee-script
+	@rm -rf LiveScript
+	@rm -rf coco
+	@rm -rf sax-js
+	@rm -rf xmldoc
+	@rm -rf FlameGraph
+	@rm -rf dtrace4linux
+	@rm -rf flow
+	@rm -rf 3883a2e9063b0a5f2705bdac3263577a03913c94.zip
+	@rm -rf es5-tests.zip
+	@rm -rf alljoyn-js ajtcl
 
 libduktape.so.1.0.0: dist
-	-rm -f $(subst .so.1.0.0,.so.1,$@) $(subst .so.1.0.0,.so.1.0.0,$@) $(subst .so.1.0.0,.so,$@)
+	rm -f $(subst .so.1.0.0,.so.1,$@) $(subst .so.1.0.0,.so.1.0.0,$@) $(subst .so.1.0.0,.so,$@)
 	$(CC) -o $@ -shared -Wl,-soname,$(subst .so.1.0.0,.so.1,$@) -fPIC $(CCOPTS_NONDEBUG) $(DUKTAPE_SOURCES) $(CCLIBS)
 	ln -s $@ $(subst .so.1.0.0,.so.1,$@)
 	ln -s $@ $(subst .so.1.0.0,.so,$@)
 
 libduktaped.so.1.0.0: dist
-	-rm -f $(subst .so.1.0.0,.so.1,$@) $(subst .so.1.0.0,.so.1.0.0,$@) $(subst .so.1.0.0,.so,$@)
+	rm -f $(subst .so.1.0.0,.so.1,$@) $(subst .so.1.0.0,.so.1.0.0,$@) $(subst .so.1.0.0,.so,$@)
 	$(CC) -o $@ -shared -Wl,-soname,$(subst .so.1.0.0,.so.1,$@) -fPIC $(CCOPTS_DEBUG) $(DUKTAPE_SOURCES) $(CCLIBS)
 	ln -s $@ $(subst .so.1.0.0,.so.1,$@)
 	ln -s $@ $(subst .so.1.0.0,.so,$@)
 
-.PHONY: debuglogcheck
-debuglogcheck:
-	-python util/check_debuglog_calls.py src/*.c
-
 duk.raw: dist
 	$(CC) -o $@ $(CCOPTS_NONDEBUG) $(DUKTAPE_SOURCES) $(DUKTAPE_CMDLINE_SOURCES) $(CCLIBS)
+	-@size $@
+
+# Test target for g++ compile
+duk-g++: dist
+	$(GXX) -o $@ $(GXXOPTS_NONDEBUG) $(DUKTAPE_SOURCES) $(DUKTAPE_CMDLINE_SOURCES) $(CCLIBS)
+	-@size $@
+dukd-g++: dist
+	$(GXX) -o $@ $(GXXOPTS_DEBUG) $(DUKTAPE_SOURCES) $(DUKTAPE_CMDLINE_SOURCES) $(CCLIBS)
+	-@size $@
+
+dump-public: duk.raw
+	@(objdump -t $< | grep ' g' | grep .text | grep -v .hidden | tr -s ' ' | cut -d ' ' -f 5 | sort > /tmp/duk-public.txt ; true)
+	@echo "Symbol dump in /tmp/duk-public.txt"
+	@(grep duk__ /tmp/duk-public.txt ; true)  # check for leaked file local symbols (does not cover internal, but not public symbols)
 
 duk.vg: duk.raw
-	-@rm -f $@
+	@rm -f $@
 	@echo '#!/bin/sh' > $@
 	@echo 'valgrind "$(shell pwd)/$<" "$$@"' >> $@
 	@chmod ugo+rx $@
 
 duk: duk.raw duk.vg
-	-@rm -f $@
+	@rm -f $@
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "Using valgrind wrapped $@"
 	@cp duk.vg $@
@@ -322,15 +399,16 @@ endif
 
 dukd.raw: dist
 	$(CC) -o $@ $(CCOPTS_DEBUG) $(DUKTAPE_SOURCES) $(DUKTAPE_CMDLINE_SOURCES) $(CCLIBS)
+	-@size $@
 
 dukd.vg: dukd.raw
-	-@rm -f $@
+	@rm -f $@
 	@echo '#!/bin/sh' > $@
 	@echo 'valgrind "$(shell pwd)/$<" "$$@"' >> $@
 	@chmod ugo+rx $@
 
 dukd: dukd.raw dukd.vg
-	-@rm -f dukd
+	@rm -f dukd
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "Using valgrind wrapped $@"
 	@cp dukd.vg $@
@@ -351,6 +429,10 @@ issuecount:
 	@echo "SCANBUILD: `grep SCANBUILD: src/*.c src/*.h src/*.in | wc -l | tr -d ' '`"
 	@echo "Ditz ($(DITZ_RELEASE)): `ditz todo $(DITZ_RELEASE) | wc -l | tr -d ' '`"
 
+.PHONY: issues
+issues:
+	ditz todo $(DITZ_RELEASE)
+
 .PHONY: dukscanbuild
 dukscanbuild: dist
 	scan-build gcc -o/tmp/duk.scanbuild -Idist/src-separate/ $(CCOPTS_NONDEBUG) $(DUKTAPE_SOURCES_SEPARATE) $(DUKTAPE_CMDLINE_SOURCES) $(CCLIBS)
@@ -362,64 +444,79 @@ dukdscanbuild: dist
 .PHONY: test
 test: qecmatest apitest regfuzztest underscoretest emscriptentest test262test
 
+RUNTESTSOPTS=--prep-test-path util/prep_test.py --minify-uglifyjs2 UglifyJS2/bin/uglifyjs --util-include-path ecmascript-testcases --known-issues doc/testcase-known-issues.json
+
 .PHONY:	ecmatest
-ecmatest: npminst duk
+ecmatest: runtestsdeps duk
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "### ecmatest (valgrind)"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/duk.raw --valgrind --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/duk.raw --report-diff-to-other --valgrind --run-nodejs --run-rhino --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
 else
 	@echo "### ecmatest"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/duk --run-nodejs --run-rhino --num-threads 8 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/duk --report-diff-to-other --run-nodejs --run-rhino --num-threads 8 --log-file=/tmp/duk-test.log ecmascript-testcases/
 endif
 
 .PHONY:	ecmatestd
-ecmatestd: npminst dukd
+ecmatestd: runtestsdeps dukd
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "### ecmatestd (valgrind)"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/dukd.raw --valgrind --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/dukd.raw --report-diff-to-other --valgrind --run-nodejs --run-rhino --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
 else
 	@echo "### ecmatestd"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/dukd --run-nodejs --run-rhino --num-threads 8 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/dukd --report-diff-to-other --run-nodejs --run-rhino --num-threads 8 --log-file=/tmp/duk-test.log ecmascript-testcases/
 endif
 
 .PHONY:	qecmatest
-qecmatest: npminst duk
+qecmatest: runtestsdeps duk
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "### qecmatest (valgrind)"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/duk.raw --valgrind --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/duk.raw --valgrind --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
 else
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/duk --num-threads 16 --log-file=/tmp/duk-test.log ecmascript-testcases/
 	@echo "### qecmatest"
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/duk --num-threads 16 --log-file=/tmp/duk-test.log ecmascript-testcases/
 endif
 
 .PHONY:	qecmatestd
-qecmatestd: npminst dukd
+qecmatestd: runtestsdeps dukd
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "### qecmatestd (valgrind)"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/dukd.raw --valgrind --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/dukd.raw --valgrind --num-threads 1 --log-file=/tmp/duk-test.log ecmascript-testcases/
 else
 	@echo "### qecmatestd"
-	$(NODE) runtests/runtests.js --run-duk --cmd-duk=$(shell pwd)/dukd --num-threads 16 --log-file=/tmp/duk-test.log ecmascript-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --run-duk --cmd-duk=$(shell pwd)/dukd --num-threads 16 --log-file=/tmp/duk-test.log ecmascript-testcases/
 endif
 
 # Separate target because it's also convenient to run manually.
 .PHONY: apiprep
-apiprep: npminst libduktape.so.1.0.0
+apiprep: runtestsdeps libduktape.so.1.0.0
 
 .PHONY:	apitest
 apitest: apiprep
 ifeq ($(VALGRIND_WRAP),1)
 	@echo "### apitest (valgrind)"
-	$(NODE) runtests/runtests.js --num-threads 1 --valgrind --log-file=/tmp/duk-api-test.log api-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --num-threads 1 --valgrind --log-file=/tmp/duk-api-test.log api-testcases/
 else
 	@echo "### apitest"
-	$(NODE) runtests/runtests.js --num-threads 1 --log-file=/tmp/duk-api-test.log api-testcases/
+	$(NODE) runtests/runtests.js $(RUNTESTSOPTS) --num-threads 1 --log-file=/tmp/duk-api-test.log api-testcases/
 endif
+
+.PHONY: matrix10
+matrix10: dist
+	cd dist; python ../util/matrix_compile.py --count=10
+.PHONY: matrix100
+matrix100: dist
+	cd dist; python ../util/matrix_compile.py --count=100
+.PHONY: matrix1000
+matrix1000: dist
+	cd dist; python ../util/matrix_compile.py --count=1000
+.PHONY: matrix10000
+matrix10000: dist
+	cd dist; python ../util/matrix_compile.py --count=10000
 
 regfuzz-0.1.tar.gz:
 	# https://code.google.com/p/regfuzz/
 	# SHA1: 774be8e3dda75d095225ba699ac59969d92ac970
-	$(WGET) https://regfuzz.googlecode.com/files/regfuzz-0.1.tar.gz
+	$(WGET) https://regfuzz.googlecode.com/files/regfuzz-0.1.tar.gz -O $@
 
 .PHONY:	regfuzztest
 regfuzztest: regfuzz-0.1.tar.gz duk
@@ -452,19 +549,32 @@ underscoretest:	underscore duk
 	#-util/underscore_test.sh ./duk underscore/test/speed.js
 	-util/underscore_test.sh ./duk underscore/test/utility.js
 
-d067d2f0ca30.tar.bz2:
+3883a2e9063b0a5f2705bdac3263577a03913c94.zip:
 	# http://test262.ecmascript.org/
-	$(WGET) http://hg.ecmascript.org/tests/test262/archive/d067d2f0ca30.tar.bz2
+	# https://github.com/tc39/test262
+	# HG repo seems to have migrated to https://github.com/tc39/test262
+	#$(WGET) http://hg.ecmascript.org/tests/test262/archive/d067d2f0ca30.tar.bz2 -O $@
+	#$(WGET) https://github.com/tc39/test262/archive/595a36b252ee97110724e6fa89fc92c9aa9a206a.zip -O $@
+	# This is a snapshot from the master, and seems to have test case bugs
+	$(WGET) https://github.com/tc39/test262/archive/3883a2e9063b0a5f2705bdac3263577a03913c94.zip -O $@
+test262-3883a2e9063b0a5f2705bdac3263577a03913c94: 3883a2e9063b0a5f2705bdac3263577a03913c94.zip
+	unzip $<
+	touch $@
 
-test262-d067d2f0ca30: d067d2f0ca30.tar.bz2
-	tar xfj d067d2f0ca30.tar.bz2
+es5-tests.zip:
+	# https://github.com/tc39/test262/tree/es5-tests
+	# This is a stable branch for ES5 tests
+	$(WGET) https://github.com/tc39/test262/archive/es5-tests.zip -O $@
+test262-es5-tests: es5-tests.zip
+	unzip $<
+	touch $@
 
 .PHONY: test262test
-test262test: test262-d067d2f0ca30 duk
+test262test: test262-es5-tests duk
 	@echo "### test262test"
 	# http://wiki.ecmascript.org/doku.php?id=test262:command
-	-rm -f /tmp/duk-test262.log /tmp/duk-test262-filtered.log
-	cd test262-d067d2f0ca30; $(PYTHON) tools/packaging/test262.py --command "../duk {{path}}" --summary >/tmp/duk-test262.log
+	rm -f /tmp/duk-test262.log /tmp/duk-test262-filtered.log
+	-cd $<; $(PYTHON) tools/packaging/test262.py --command "../duk {{path}}" --summary >/tmp/duk-test262.log
 	cat /tmp/duk-test262.log | $(PYTHON) util/filter_test262_log.py doc/test262-known-issues.json > /tmp/duk-test262-filtered.log
 	cat /tmp/duk-test262-filtered.log
 
@@ -472,9 +582,9 @@ test262test: test262-d067d2f0ca30 duk
 # command line arguments and complains about missing targets etc:
 # http://stackoverflow.com/questions/6273608/how-to-pass-argument-to-makefile-from-command-line
 .PHONY: test262cat
-test262cat: test262-d067d2f0ca30
+test262cat: test262-es5-tests
 	@echo "NOTE: this Makefile target will print a 'No rule...' error, ignore it" >&2
-	@cd test262-d067d2f0ca30; $(PYTHON) tools/packaging/test262.py --command "../duk {{path}}" --cat $(filter-out $@,$(MAKECMDGOALS))
+	-@cd $<; $(PYTHON) tools/packaging/test262.py --command "../duk {{path}}" --cat $(filter-out $@,$(MAKECMDGOALS))
 
 emscripten:
 	# https://github.com/kripken/emscripten
@@ -487,13 +597,13 @@ emscripten:
 # Recent Emscripten will assume typed array support unless EMCC_FAST_COMPILER=0
 # is given through the environment:
 # https://github.com/kripken/emscripten/wiki/LLVM-Backend
-#EMCCOPTS=-s USE_TYPED_ARRAYS=0 -s TOTAL_MEMORY=2097152 -s TOTAL_STACK=524288
-EMCCOPTS=-s USE_TYPED_ARRAYS=0
+#EMCCOPTS=-s USE_TYPED_ARRAYS=0 -s TOTAL_MEMORY=2097152 -s TOTAL_STACK=524288 --memory-init-file 0
+EMCCOPTS=-s USE_TYPED_ARRAYS=0 --memory-init-file 0
 
 .PHONY: emscriptentest
 emscriptentest: emscripten duk
 	@echo "### emscriptentest"
-	-@rm -f /tmp/duk-emcc-test*
+	@rm -f /tmp/duk-emcc-test*
 	@echo "NOTE: this emscripten test is incomplete (compiles hello_world.cpp and tries to run it, no checks yet)"
 	EMCC_FAST_COMPILER=0 emscripten/emcc $(EMCCOPTS) emscripten/tests/hello_world.cpp -o /tmp/duk-emcc-test.js
 	cat /tmp/duk-emcc-test.js | $(PYTHON) util/fix_emscripten.py > /tmp/duk-emcc-test-fixed.js
@@ -511,16 +621,18 @@ emscriptentest: emscripten duk
 #     problem:
 #     "too many setjmps in a function call, build with a higher value for MAX_SETJMPS"
 #   - Using -O2 without asm.js for now.
+#   - --memory-init-file 0 to avoid a separate memory init file (this is
+#     not mandatory but keeps the result in a single file)
 # https://github.com/kripken/emscripten/wiki/Optimizing-Code
 # http://mozakai.blogspot.fi/2013/08/outlining-workaround-for-jits-and-big.html
-EMCCOPTS_DUKVM=-O2 -std=c99 -Wall -s OUTLINING_LIMIT=20000 -s MAX_SETJMPS=1000 -s ASM_JS=0 -DEMSCRIPTEN
+EMCCOPTS_DUKVM=-O2 -std=c99 -Wall -s OUTLINING_LIMIT=20000 -s MAX_SETJMPS=1000 -s ASM_JS=0 --memory-init-file 0 -DEMSCRIPTEN
 
 MAND_BASE64=dyA9IDgwOyBoID0gNDA7IGl0ZXIgPSAxMDA7IGZvciAoaSA9IDA7IGkgLSBoOyBpICs9IDEpIHsgeTAgPSAoaSAvIGgpICogNC4wIC0gMi4wOyByZXMgPSBbXTsgZm9yIChqID0gMDsgaiAtIHc7IGogKz0gMSkgeyB4MCA9IChqIC8gdykgKiA0LjAgLSAyLjA7IHh4ID0gMDsgeXkgPSAwOyBjID0gIiMiOyBmb3IgKGsgPSAwOyBrIC0gaXRlcjsgayArPSAxKSB7IHh4MiA9IHh4Knh4OyB5eTIgPSB5eSp5eTsgaWYgKE1hdGgubWF4KDAsIDQuMCAtICh4eDIgKyB5eTIpKSkgeyB5eSA9IDIqeHgqeXkgKyB5MDsgeHggPSB4eDIgLSB5eTIgKyB4MDsgfSBlbHNlIHsgYyA9ICIuIjsgYnJlYWs7IH0gfSByZXNbcmVzLmxlbmd0aF0gPSBjOyB9IHByaW50KHJlcy5qb2luKCIiKSk7IH0K
 
 .PHONY: emscriptenduktest
 emscriptenduktest: emscripten dist
 	@echo "### emscriptenduktest"
-	-@rm -f /tmp/duk-emcc-duktest.js
+	@rm -f /tmp/duk-emcc-duktest.js
 	EMCC_FAST_COMPILER=0 emscripten/emcc $(EMCCOPTS_DUKVM) -DDUK_OPT_ASSERTIONS -DDUK_OPT_SELF_TESTS -Idist/src/ dist/src/duktape.c dist/examples/eval/eval.c -o /tmp/duk-emcc-duktest.js
 	$(NODE) /tmp/duk-emcc-duktest.js \
 		'print("Hello from Duktape running inside Emscripten/NodeJS");' \
@@ -532,7 +644,7 @@ emscriptenduktest: emscripten dist
 # and providing an eval() facility from both sides.  This is a placeholder now
 # and doesn't do anything useful yet.
 EMCCOPTS_DUKWEB_EXPORT=-s EXPORTED_FUNCTIONS='["_dukweb_is_open", "_dukweb_open","_dukweb_close","_dukweb_eval"]'
-EMCCOPTS_DUKWEB_DEFINES=-DDUK_OPT_ASSERTIONS -DDUK_OPT_SELF_TESTS '-DDUK_OPT_DECLARE=extern void dukweb_panic_handler(int code, const char *msg);' '-DDUK_OPT_PANIC_HANDLER(code,msg)={dukweb_panic_handler((code),(msg));abort();}' 
+EMCCOPTS_DUKWEB_DEFINES=-DDUK_OPT_ASSERTIONS -DDUK_OPT_SELF_TESTS -DDUK_OPT_DEEP_C_STACK '-DDUK_OPT_DECLARE=extern void dukweb_panic_handler(int code, const char *msg);' '-DDUK_OPT_PANIC_HANDLER(code,msg)={dukweb_panic_handler((code),(msg));abort();}' 
 
 # FIXME: need to be able to declare dukweb_panic_handler to avoid warnings
 dukweb.js: emscripten dist
@@ -544,16 +656,16 @@ dukweb.js: emscripten dist
 .PHONY: dukwebtest
 dukwebtest: dukweb.js jquery-1.11.0.js
 	@echo "### dukwebtest"
-	-@rm -rf /tmp/dukweb-test/
+	@rm -rf /tmp/dukweb-test/
 	mkdir /tmp/dukweb-test/
 	cp dukweb.js jquery-1.11.0.js dukweb/dukweb.html dukweb/dukweb.css /tmp/dukweb-test/
 	@echo "Now point your browser to: file:///tmp/dukweb-test/dukweb.html"
 
 jquery-1.11.0.js:
-	$(WGET) http://code.jquery.com/jquery-1.11.0.js
+	$(WGET) http://code.jquery.com/jquery-1.11.0.js -O $@
 
 lua-5.2.3.tar.gz:
-	$(WGET) http://www.lua.org/ftp/lua-5.2.3.tar.gz
+	$(WGET) http://www.lua.org/ftp/lua-5.2.3.tar.gz -O $@
 
 lua-5.2.3: lua-5.2.3.tar.gz
 	tar xfz lua-5.2.3.tar.gz
@@ -570,7 +682,7 @@ LUASRC=	lapi.c lauxlib.c lbaselib.c lbitlib.c lcode.c lcorolib.c lctype.c \
 .PHONY: emscriptenluatest
 emscriptenluatest: emscripten duk lua-5.2.3
 	@echo "### emscriptenluatest"
-	-@rm -f /tmp/duk-emcc-luatest*
+	@rm -f /tmp/duk-emcc-luatest*
 	EMCC_FAST_COMPILER=0 emscripten/emcc $(EMCCOPTS) -Ilua-5.2.3/src/ $(patsubst %,lua-5.2.3/src/%,$(LUASRC)) -o /tmp/duk-emcc-luatest.js
 	cat /tmp/duk-emcc-luatest.js | $(PYTHON) util/fix_emscripten.py > /tmp/duk-emcc-luatest-fixed.js
 	@ls -l /tmp/duk-emcc-luatest*
@@ -584,7 +696,7 @@ JS-Interpreter:
 .PHONY: jsinterpretertest
 jsinterpretertest: JS-Interpreter duk
 	@echo "### jsinterpretertest"
-	-@rm -f /tmp/duk-jsint-test*
+	@rm -f /tmp/duk-jsint-test*
 	echo "window = {};" > /tmp/duk-jsint-test.js
 	cat JS-Interpreter/acorn.js JS-Interpreter/interpreter.js >> /tmp/duk-jsint-test.js
 	cat jsinterpreter-testcases/addition.js >> /tmp/duk-jsint-test.js
@@ -592,45 +704,71 @@ jsinterpretertest: JS-Interpreter duk
 
 luajs.zip:
 	# https://github.com/mherkender/lua.js
-	$(WGET) https://github.com/mherkender/lua.js/raw/precompiled2/luajs.zip
+	$(WGET) https://github.com/mherkender/lua.js/raw/precompiled2/luajs.zip -O $@
 
 luajs: luajs.zip
-	-@rm -rf luajs/
+	@rm -rf luajs/
 	mkdir luajs
 	cd luajs; unzip ../luajs.zip
 
 .PHONY: luajstest
 luajstest: luajs duk
-	-@rm -f /tmp/duk-luajs-mandel.js /tmp/duk-luajs-test.js
+	@rm -f /tmp/duk-luajs-mandel.js /tmp/duk-luajs-test.js
 	luajs/lua2js luajs-testcases/mandel.lua /tmp/duk-luajs-mandel.js
 	echo "console = { log: function() { print(Array.prototype.join.call(arguments, ' ')); } };" > /tmp/duk-luajs-test.js
 	cat luajs/lua.js /tmp/duk-luajs-mandel.js >> /tmp/duk-luajs-test.js
 	./duk /tmp/duk-luajs-test.js
 
+bluebird.js:
+	$(WGET) https://cdn.jsdelivr.net/bluebird/latest/bluebird.js -O $@
+
+.PHONY: bluebirdtest
+bluebirdtest: bluebird.js duk
+	@rm -f /tmp/duk-bluebird-test.js
+	cat util/bluebird-test-shim.js bluebird.js > /tmp/duk-bluebird-test.js
+	echo "var myPromise = new Promise(function(resolve, reject) { setTimeout(function () { resolve('resolved 123') }, 1000); });" >> /tmp/duk-bluebird-test.js
+	echo "myPromise.then(function (v) { print('then:', v); });" >> /tmp/duk-bluebird-test.js
+	echo "fakeEventLoop();" >> /tmp/duk-bluebird-test.js
+	./duk /tmp/duk-bluebird-test.js
+
 # Closure
 compiler-latest.zip:
+	# Prebuilt latest version; this is not good as a build dependency
+	# because closure changes may break minified initjs code and make
+	# old builds unreliable.
 	# https://code.google.com/p/closure-compiler/
-	$(WGET) http://dl.google.com/closure-compiler/compiler-latest.zip
+	$(WGET) http://dl.google.com/closure-compiler/compiler-latest.zip -O $@
 
-compiler.jar: compiler-latest.zip
-	unzip compiler-latest.zip compiler.jar
-	touch compiler.jar  # ensure date is newer than compiler-latest.zip
+closure-compiler:
+	# https://github.com/google/closure-compiler
+	@rm -f v20140814.tar.gz
+	$(WGET) https://github.com/google/closure-compiler/archive/v20140814.tar.gz -O v20140814.tar.gz
+	tar xfz v20140814.tar.gz
+	mv closure-compiler-20140814 closure-compiler
+	@rm -f v20140814.tar.gz
+
+closure-compiler/build/compiler.jar: closure-compiler
+	cd closure-compiler; ant
+
+compiler.jar: closure-compiler/build/compiler.jar
+	cp closure-compiler/build/compiler.jar $@
+	touch $@  # ensure date is newer than compiler-latest.zip
 
 .PHONY: closuretest
 closuretest: compiler.jar duk
 	@echo "### closuretest"
-	-@rm -f /tmp/duk-closure-test*
+	@rm -f /tmp/duk-closure-test*
 	$(JAVA) -jar compiler.jar ecmascript-testcases/test-dev-mandel2-func.js > /tmp/duk-closure-test.js
 	./duk /tmp/duk-closure-test.js
 
 UglifyJS:
 	# https://github.com/mishoo/UglifyJS
 	# Use a specific release because UglifyJS is used in building Duktape
-	-@rm -f v1.3.5.tar.gz
-	$(WGET) https://github.com/mishoo/UglifyJS/archive/v1.3.5.tar.gz
+	@rm -f v1.3.5.tar.gz
+	$(WGET) https://github.com/mishoo/UglifyJS/archive/v1.3.5.tar.gz -O v1.3.5.tar.gz
 	tar xfz v1.3.5.tar.gz
 	mv UglifyJS-1.3.5 UglifyJS
-	-@rm -f v1.3.5.tar.gz
+	@rm -f v1.3.5.tar.gz
 
 	# Don't use this because it's a moving critical dependency
 	#$(GIT) clone --depth 1 https://github.com/mishoo/UglifyJS.git
@@ -640,11 +778,11 @@ UglifyJS2:
 	# Use a specific release because UglifyJS2 is used in building Duktape
 	# (This is now a bit futile because UglifyJS2 requires an 'npm install',
 	# the NodeJS dependencies need to be controlled for this to really work.)
-	-@rm -f v2.4.12.tar.gz
-	$(WGET) https://github.com/mishoo/UglifyJS2/archive/v2.4.12.tar.gz
+	@rm -f v2.4.12.tar.gz
+	$(WGET) https://github.com/mishoo/UglifyJS2/archive/v2.4.12.tar.gz -O v2.4.12.tar.gz
 	tar xfz v2.4.12.tar.gz
 	mv UglifyJS2-2.4.12 UglifyJS2
-	-@rm -f v2.4.12.tar.gz
+	@rm -f v2.4.12.tar.gz
 
 	# Don't use this because it's a moving critical dependency
 	#$(GIT) clone --depth 1 https://github.com/mishoo/UglifyJS2.git
@@ -653,7 +791,7 @@ UglifyJS2:
 
 cloc-1.60.pl:
 	# http://cloc.sourceforge.net/
-	$(WGET) http://downloads.sourceforge.net/project/cloc/cloc/v1.60/cloc-1.60.pl
+	$(WGET) http://downloads.sourceforge.net/project/cloc/cloc/v1.60/cloc-1.60.pl -O $@
 
 coffee-script:
 	# http://coffeescript.org/
@@ -680,7 +818,7 @@ xmldoc:
 
 xmldoctest: sax-js xmldoc duk
 	@echo "### xmldoctest"
-	-@rm -f /tmp/duk-xmldoc-test*
+	@rm -f /tmp/duk-xmldoc-test*
 	cat sax-js/lib/sax.js > /tmp/duk-xmldoc-test.js
 	echo ";" >> /tmp/duk-xmldoc-test.js  # missing end semicolon causes automatic semicolon problem
 	cat xmldoc/lib/xmldoc.js >> /tmp/duk-xmldoc-test.js
@@ -698,6 +836,75 @@ dtrace4linux:
 	# http://crtags.blogspot.fi/
 	$(GIT) clone --depth 1 https://github.com/dtrace4linux/linux.git dtrace4linux
 
+flow:
+	# https://github.com/facebook/flow
+	$(GIT) clone --depth 1 https://github.com/facebook/flow.git
+
+alljoyn-js:
+	# https://git.allseenalliance.org/cgit/core/alljoyn-js.git/
+	# no --depth 1 ("dumb http transport does not support --depth")
+	$(GIT) clone https://git.allseenalliance.org/gerrit/core/alljoyn-js.git
+
+ajtcl:
+	# https://git.allseenalliance.org/cgit/core/ajtcl.git/
+	# no --depth 1 ("dumb http transport does not support --depth")
+	$(GIT) clone https://git.allseenalliance.org/gerrit/core/ajtcl.git/
+
+CCOPTS_AJDUK = -m32
+#CCOPTS_AJDUK += '-fpack-struct=1'
+CCOPTS_AJDUK += -Wno-unused-parameter -Wno-pedantic -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-result
+CCOPTS_AJDUK += -UDUK_CMDLINE_FANCY -DDUK_CMDLINE_AJSHEAP -D_POSIX_C_SOURCE=200809L
+CCOPTS_AJDUK += -DDUK_OPT_FORCE_ALIGN=4
+CCOPTS_AJDUK += -DDUK_OPT_ASSERTIONS
+CCOPTS_AJDUK += -DDUK_OPT_LIGHTFUNC_BUILTINS
+CCOPTS_AJDUK += -DDUK_OPT_REFCOUNT16
+CCOPTS_AJDUK += -DDUK_OPT_STRHASH16
+CCOPTS_AJDUK += -DDUK_OPT_STRLEN16
+CCOPTS_AJDUK += -DDUK_OPT_BUFLEN16
+CCOPTS_AJDUK += -DDUK_OPT_OBJSIZES16
+CCOPTS_AJDUK += -DDUK_OPT_STRTAB_CHAIN
+CCOPTS_AJDUK += -DDUK_OPT_STRTAB_CHAIN_SIZE=128
+CCOPTS_AJDUK += -DDUK_OPT_HEAPPTR16
+CCOPTS_AJDUK += '-DDUK_OPT_HEAPPTR_ENC16(ud,p)=ajsheap_enc16((ud),(p))'
+CCOPTS_AJDUK += '-DDUK_OPT_HEAPPTR_DEC16(ud,x)=ajsheap_dec16((ud),(x))'
+CCOPTS_AJDUK += -DDUK_OPT_EXTERNAL_STRINGS
+#CCOPTS_AJDUK += '-DDUK_OPT_EXTSTR_INTERN_CHECK(ud,ptr,len)=ajsheap_extstr_check_1((ptr),(len))'
+#CCOPTS_AJDUK += '-DDUK_OPT_EXTSTR_FREE(ud,ptr)=ajsheap_extstr_free_1((ptr))'
+CCOPTS_AJDUK += '-DDUK_OPT_EXTSTR_INTERN_CHECK(ud,ptr,len)=ajsheap_extstr_check_2((ptr),(len))'
+CCOPTS_AJDUK += '-DDUK_OPT_EXTSTR_FREE(ud,ptr)=ajsheap_extstr_free_2((ptr))'
+#CCOPTS_AJDUK += '-DDUK_OPT_EXTSTR_INTERN_CHECK(ud,ptr,len)=ajsheap_extstr_check_3((ptr),(len))'
+#CCOPTS_AJDUK += '-DDUK_OPT_EXTSTR_FREE(ud,ptr)=ajsheap_extstr_free_3((ptr))'
+CCOPTS_AJDUK += '-DDUK_OPT_EXEC_TIMEOUT_CHECK(udata)=ajsheap_exec_timeout_check(udata)'
+CCOPTS_AJDUK += '-DDUK_OPT_DECLARE=extern uint8_t *ajsheap_ram; extern duk_uint16_t ajsheap_enc16(void *ud, void *p); extern void *ajsheap_dec16(void *ud, duk_uint16_t x); extern const void *ajsheap_extstr_check_1(const void *ptr, duk_size_t len); extern const void *ajsheap_extstr_check_2(const void *ptr, duk_size_t len); extern const void *ajsheap_extstr_check_3(const void *ptr, duk_size_t len); extern void ajsheap_extstr_free_1(const void *ptr); extern void ajsheap_extstr_free_2(const void *ptr); extern void ajsheap_extstr_free_3(const void *ptr); extern duk_bool_t ajsheap_exec_timeout_check(void *udata);'
+#CCOPTS_AJDUK += -DDUK_OPT_DEBUG -DDUK_OPT_DPRINT
+#CCOPTS_AJDUK += -DDUK_OPT_DEBUG -DDUK_OPT_DPRINT -DDUK_OPT_DDPRINT -DDUK_OPT_DDDPRINT
+
+# Command line with Alljoyn.js pool allocator, for low memory testing.
+# The pool sizes only make sense with -m32, so force that.  This forces
+# us to use barebones cmdline too.
+ajduk: alljoyn-js ajtcl dist
+	$(CC) -o $@ \
+		-Ialljoyn-js/ -Iajtcl/inc/ -Iajtcl/target/linux/ \
+		$(CCOPTS_NONDEBUG) \
+		$(CCOPTS_AJDUK) \
+		$(DUKTAPE_SOURCES) $(DUKTAPE_CMDLINE_SOURCES) \
+		dist/examples/cmdline/duk_cmdline_ajduk.c \
+		alljoyn-js/ajs_heap.c ajtcl/src/aj_debug.c ajtcl/target/linux/aj_target_util.c \
+		-lm -lpthread
+	@echo "*** SUCCESS:"
+	@ls -l ajduk
+ajdukd: alljoyn-js ajtcl dist
+	$(CC) -o $@ \
+		-Ialljoyn-js/ -Iajtcl/inc/ -Iajtcl/target/linux/ \
+		$(CCOPTS_DEBUG) \
+		$(CCOPTS_AJDUK) \
+		$(DUKTAPE_SOURCES) $(DUKTAPE_CMDLINE_SOURCES) \
+		dist/examples/cmdline/duk_cmdline_ajduk.c \
+		alljoyn-js/ajs_heap.c ajtcl/src/aj_debug.c ajtcl/target/linux/aj_target_util.c \
+		-lm -lpthread
+	@echo "*** SUCCESS:"
+	@ls -l ajdukd
+
 .PHONY: gccpredefs
 gccpredefs:
 	gcc -dM -E - < /dev/null
@@ -706,8 +913,8 @@ gccpredefs:
 clangpredefs:
 	clang -dM -E - < /dev/null
 
-.PHONY:	npminst
-npminst:	runtests/node_modules
+.PHONY:	runtestsdeps
+runtestsdeps:	runtests/node_modules UglifyJS2
 
 runtests/node_modules:
 	echo "Installing required NodeJS modules for runtests"
@@ -720,11 +927,11 @@ doc/%.html: doc/%.txt
 	rst2html $< $@
 
 # Source distributable for end users
-# XXX: want to run debuglogcheck when dist gets built, but don't want to depend on it.
+# XXX: want to run codepolicycheck when dist gets built, but don't want to depend on it.
 # XXX: make prints a harmless warning related to the sub-make.
 dist:	compiler.jar cloc-1.60.pl
-	@make debuglogcheck
-	sh util/make_dist.sh
+	@make codepolicycheck
+	sh util/make_dist.sh --minify closure
 
 .PHONY:	dist-src
 dist-src:	dist
@@ -733,36 +940,84 @@ dist-src:	dist
 	mkdir duktape-$(DUK_VERSION_FORMATTED)
 	cp -r dist/* duktape-$(DUK_VERSION_FORMATTED)/
 	tar cvfz duktape-$(DUK_VERSION_FORMATTED).tar.gz duktape-$(DUK_VERSION_FORMATTED)/
-	cp duktape-$(DUK_VERSION_FORMATTED).tar.gz duktape-$(DUK_VERSION_FORMATTED)-$(GIT_DESCRIBE).tar.gz
-	tar cvfj duktape-$(DUK_VERSION_FORMATTED).tar.bz2 duktape-$(DUK_VERSION_FORMATTED)/
-	cp duktape-$(DUK_VERSION_FORMATTED).tar.bz2 duktape-$(DUK_VERSION_FORMATTED)-$(GIT_DESCRIBE).tar.bz2
 	tar cvf duktape-$(DUK_VERSION_FORMATTED).tar duktape-$(DUK_VERSION_FORMATTED)/
 	xz -z -e -9 duktape-$(DUK_VERSION_FORMATTED).tar
-	cp duktape-$(DUK_VERSION_FORMATTED).tar.xz duktape-$(DUK_VERSION_FORMATTED)-$(GIT_DESCRIBE).tar.xz
-	zip -r duktape-$(DUK_VERSION_FORMATTED).zip duktape-$(DUK_VERSION_FORMATTED)/
-	cp duktape-$(DUK_VERSION_FORMATTED).zip duktape-$(DUK_VERSION_FORMATTED)-$(GIT_DESCRIBE).zip
-	mkisofs -input-charset utf-8 -o duktape-$(DUK_VERSION_FORMATTED).iso duktape-$(DUK_VERSION_FORMATTED).tar.bz2
-	cp duktape-$(DUK_VERSION_FORMATTED).iso duktape-$(DUK_VERSION_FORMATTED)-$(GIT_DESCRIBE).iso
+	cp duktape-$(DUK_VERSION_FORMATTED).tar.gz duktape-$(DUK_VERSION_FORMATTED)-$(BUILD_DATETIME)-$(GIT_DESCRIBE).tar.gz
+	cp duktape-$(DUK_VERSION_FORMATTED).tar.xz duktape-$(DUK_VERSION_FORMATTED)-$(BUILD_DATETIME)-$(GIT_DESCRIBE).tar.xz
+	rm -rf duktape-$(DUK_VERSION_FORMATTED)
+
+# ISO target is useful with some system emulators with no network access
+.PHONY: dist-iso
+dist-iso:	dist-src
+	mkisofs -input-charset utf-8 -o duktape-$(DUK_VERSION_FORMATTED)-$(BUILD_DATETIME)-$(GIT_DESCRIBE).iso duktape-$(DUK_VERSION_FORMATTED)-$(BUILD_DATETIME)-$(GIT_DESCRIBE).tar.gz
 
 .PHONY: tidy-site
 tidy-site:
 	for i in website/*/*.html; do echo "*** Checking $$i"; tidy -q -e -xml $$i; done
 
+# Duktape binary releases are in a separate repo
+duktape-releases:
+	$(GIT) clone https://github.com/svaarala/duktape-releases.git
+
 # Website
-site: dukweb.js jquery-1.11.0.js
+site: duktape-releases dukweb.js jquery-1.11.0.js
 	rm -rf site
 	mkdir site
+	-cd duktape-releases/; git pull --rebase  # get binaries up-to-date, but allow errors for offline use
 	cd website/; $(PYTHON) buildsite.py ../site/
-	-@rm -rf /tmp/site/
+	@rm -rf /tmp/site/
 	cp -r site /tmp/  # FIXME
 
 .PHONY:	dist-site
 dist-site:	tidy-site site
 	# When doing a final dist build, run html tidy
+	# Also pull binaries up-to-date
+	cd duktape-releases/; git pull --rebase  # get binaries up-to-date
 	rm -rf duktape-site-$(DUK_VERSION_FORMATTED)
 	rm -rf duktape-site-$(DUK_VERSION_FORMATTED).tar*
 	mkdir duktape-site-$(DUK_VERSION_FORMATTED)
 	cp -r site/* duktape-site-$(DUK_VERSION_FORMATTED)/
 	tar cvf duktape-site-$(DUK_VERSION_FORMATTED).tar duktape-site-$(DUK_VERSION_FORMATTED)/
 	xz -z -e -9 duktape-site-$(DUK_VERSION_FORMATTED).tar
+	cp duktape-site-$(DUK_VERSION_FORMATTED).tar.xz duktape-site-$(DUK_VERSION_FORMATTED)-$(BUILD_DATETIME)-$(GIT_DESCRIBE).tar.xz
+	rm -rf duktape-site-$(DUK_VERSION_FORMATTED)
 
+.PHONY: codepolicycheck
+codepolicycheck:
+	-python util/check_code_policy.py src/*.c src/*.h src/*.h.in api-testcases/*.c
+
+.PHONY: codepolicycheckvim
+codepolicycheckvim:
+	-python util/check_code_policy.py --dump-vim-commands src/*.c src/*.h src/*.h.in api-testcases/*.c
+
+.PHONY: big-git-files
+big-git-files:
+	util/find_big_git_files.sh
+
+# Alignment check
+.PHONY: checkalign
+checkalign:
+	@echo "checkalign for: `uname -a`"
+	gcc -o /tmp/check_align -Wall -Wextra util/check_align.c
+	@cp util/check_align.sh /tmp
+	@cd /tmp; sh check_align.sh
+
+# Simple heap graph and peak usage using valgrind --tool=massif, for quick
+# and dirty baseline comparison.  Say e.g. 'make massif-test-dev-hello-world'.
+# The target name is intentionally not 'massif-%.out' so that the rule is never
+# satisfied and can be executed multiple times without cleaning.
+# Grep/sed hacks from:
+# http://stackoverflow.com/questions/774556/peak-memory-usage-of-a-linux-unix-process
+massif-%: ecmascript-testcases/%.js duk
+	@rm -f $(@).out
+	valgrind --tool=massif --peak-inaccuracy=0.0 --massif-out-file=$(@).out ./duk $< >/dev/null 2>/dev/null
+	@ms_print $(@).out | head -35
+	@echo "[... clipped... ]"
+	@echo ""
+	@echo -n "MAXIMUM: "
+	@cat $(@).out | grep mem_heap_B | sed -e 's/mem_heap_B=\(.*\)/\1/' | sort -g | tail -n 1
+
+# Convenience targets
+massif-helloworld: massif-test-dev-hello-world
+massif-deepmerge: massif-test-dev-deepmerge
+massif-arcfour: massif-test-dev-arcfour

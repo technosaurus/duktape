@@ -1,8 +1,3 @@
-
-/*===
-true
-===*/
-
 /*
  *  Date.prototype.toGMTString is required to have the same Function
  *  object as Date.prototype.toUTCString in E5 Section B.2.6.
@@ -11,5 +6,8 @@ true
  *  objects are distinct).
  */
 
-print(Date.prototype.toGMTString === Date.prototype.toUTCString);
+/*===
+true
+===*/
 
+print(Date.prototype.toGMTString === Date.prototype.toUTCString);

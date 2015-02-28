@@ -25,3 +25,7 @@ duk_pop(ctx);
 
 =tags
 compile
+protected
+
+=introduced
+1.0.0

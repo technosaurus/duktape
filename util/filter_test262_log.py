@@ -40,7 +40,7 @@ def main():
 
 		print(line)  # print error list as is, then refined version later
 
-		if line == 'Failed tests':
+		if 'failed tests' in line.lower():
 			in_failed_tests = True
 			continue
 
@@ -60,9 +60,9 @@ def main():
 				if kn.has_key('diagnosed'):
 					tofix_count += 1
 					diagnosed_errors.append(line + '   // diagnosed: ' + kn['diagnosed'])
-				elif kn.has_key('known'):
+				elif kn.has_key('knownissue'):
 					# don't bump tofix_count, as testcase expected result is not certain
-					known_errors.append(line + '   // KNOWN: ' + kn['known'])
+					known_errors.append(line + '   // KNOWN: ' + kn['knownissue'])
 				else:
 					tofix_count += 1
 					unknown_errors.append(line + '   // ??? (rule matches))')

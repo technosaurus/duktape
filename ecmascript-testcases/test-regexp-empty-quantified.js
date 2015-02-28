@@ -16,12 +16,6 @@
  *
  */
 
-/*---
-{
-    "knownissue": "a suitable empty quantified (e.g. '(x*)*') causes regexp parsing to terminate due to step limit"
-}
----*/
-
 var t;
 
 /*===
@@ -74,4 +68,3 @@ print(t[0], typeof t[0]);
 
 t = /(?:(?=x))+xyz/.exec('xy');
 print(t, typeof t);
-

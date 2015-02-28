@@ -19,8 +19,10 @@ built into Duktape:
   module search function.
 
 * C modules, static or DLL-based, can be implemented on top of the module
-  search function by user code.  Because DLL handling is inherently
-  unportable, there is no built-in DLL support at the moment.
+  search function by user code.  There is no built-in C module support in
+  the main Duktape library to avoid portability issues for exotic platforms.
+  However, there is a recommended convention which works on most platforms
+  and allows both static and DLL loading, see ``c-module-convention.rst``.
 
 Using modules from Ecmascript code (require)
 ============================================
@@ -59,6 +61,9 @@ provided by the user (there is no default)::
   Duktape.modSearch = function (id, require, exports, module) {
     // ...
   };
+
+The identifier given to the ``modSearch()`` function is a fully resolved,
+absolute identifier.
 
 If the search function cannot locate a module based on its identifier, it is
 expected to throw an error.  If a module is found, the search function can
@@ -208,8 +213,23 @@ which initially has the same value as ``exports``:
 
 Duktape doesn't currently support assignment to ``module.exports``.
 
-C modules (DLLs)
-================
+C modules and DLLs
+==================
+
+Recommended convention
+----------------------
+
+``c-module-convention.rst`` describes a recommended convention for defining
+an init function for a C module.  The convention allows a C module to be
+initialized manually when using static linking, or as part of loading the
+module from a DLL.
+
+The recommendation is in no way mandatory and you can easily write a module
+loader with your own conventions (see below).  However, modules following
+the recommended convention will be easier to share between projects.
+
+Implementing a C module / DLL loader
+------------------------------------
 
 The user provided module search function can be used to implement DLL support.
 Simply load the DLL based on the module identifier, and call some kind of init
@@ -232,8 +252,6 @@ Limitations:
   (e.g. through a finalizer) is **not** enough because other modules can
   copy references to individual exported values.
 
-* At the moment there are no recommended DLL conventions, see future work.
-
 Background
 ==========
 
@@ -252,6 +270,7 @@ have been defined.
 References summarizing several module frameworks:
 
 * http://addyosmani.com/writing-modular-js/
+
 * http://wiki.commonjs.org/wiki/Modules
 
 Module loading APIs or "formats":
@@ -263,9 +282,13 @@ Module loading APIs or "formats":
 * CommonJS:
 
   - http://wiki.commonjs.org/wiki/Modules/1.1.1
+
   - https://github.com/joyent/node/blob/master/lib/module.js
+
   - https://github.com/commonjs/commonjs/tree/master/tests/modules
+
   - http://requirejs.org/docs/commonjs.html
+
   - http://dailyjs.com/2010/10/18/modules/
 
 * NodeJS, more or less CommonJS:
@@ -344,8 +367,6 @@ Several ideas to improve the C module support:
   ``Duktape.modLoaded`` registration can be done in-between.
 
 * Provide a default DLL loading helper for at least POSIX and Windows.
-
-* Provide suggested module initialization conventions.
 
 Module unloading support
 ------------------------

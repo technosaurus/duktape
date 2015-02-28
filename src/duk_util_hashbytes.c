@@ -13,7 +13,7 @@
 #define DUK__MAGIC_M  ((duk_uint32_t) 0x5bd1e995UL)
 #define DUK__MAGIC_R  24
 
-duk_uint32_t duk_util_hashbytes(duk_uint8_t *data, duk_size_t len, duk_uint32_t seed) {
+DUK_INTERNAL duk_uint32_t duk_util_hashbytes(const duk_uint8_t *data, duk_size_t len, duk_uint32_t seed) {
 	duk_uint32_t h = seed ^ len;
 
 	while (len >= 4) {
@@ -41,10 +41,10 @@ duk_uint32_t duk_util_hashbytes(duk_uint8_t *data, duk_size_t len, duk_uint32_t 
 	}
 
 	switch (len) {
-		case 3:	h ^= data[2] << 16;
-		case 2:	h ^= data[1] << 8;
-		case 1:	h ^= data[0];
-			h *= DUK__MAGIC_M;
+	case 3: h ^= data[2] << 16;
+	case 2: h ^= data[1] << 8;
+	case 1: h ^= data[0];
+	        h *= DUK__MAGIC_M;
         }
 
 	h ^= h >> 13;
@@ -53,4 +53,3 @@ duk_uint32_t duk_util_hashbytes(duk_uint8_t *data, duk_size_t len, duk_uint32_t 
 
 	return h;
 }
-

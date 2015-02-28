@@ -1,31 +1,23 @@
 /*
- *  Command line execution tool.  Used by test cases and other manual testing.
+ *  Command line execution tool.  Useful for test cases and manual testing.
  *
- *  For maximum portability, compile with -DDUK_CMDLINE_BAREBONES
+ *  To enable readline and other fancy stuff, compile with -DDUK_CMDLINE_FANCY.
+ *  It is not the default to maximize portability.  You can also compile in
+ *  support for example allocators, grep for DUK_CMDLINE_*.
  */
 
-#if defined(_WIN32) || defined(_WIN64) || defined(WIN32) || \
-    defined(__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
-#ifndef DUK_CMDLINE_BAREBONES
-/* Force barebones mode on Windows. */
-#define DUK_CMDLINE_BAREBONES
-#endif
-#endif
-
-#ifdef DUK_CMDLINE_BAREBONES
+#ifndef DUK_CMDLINE_FANCY
 #define NO_READLINE
 #define NO_RLIMIT
 #define NO_SIGNAL
 #endif
 
 #define  GREET_CODE(variant)  \
-	"print(" \
-	"'((o) Duktape" variant "'" \
-	", " \
+	"print('((o) Duktape" variant " ' + " \
 	"Math.floor(Duktape.version / 10000) + '.' + " \
 	"Math.floor(Duktape.version / 100) % 100 + '.' + " \
 	"Duktape.version % 100" \
-	");"
+	", '(" DUK_GIT_DESCRIBE ")');"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,21 +32,38 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #endif
-
+#ifdef DUK_CMDLINE_ALLOC_LOGGING
+#include "duk_alloc_logging.h"
+#endif
+#ifdef DUK_CMDLINE_ALLOC_TORTURE
+#include "duk_alloc_torture.h"
+#endif
+#ifdef DUK_CMDLINE_ALLOC_HYBRID
+#include "duk_alloc_hybrid.h"
+#endif
 #include "duktape.h"
+
+#ifdef DUK_CMDLINE_AJSHEAP
+/* Defined in duk_cmdline_ajduk.c or alljoyn.js headers. */
+void ajsheap_init(void);
+void ajsheap_dump(void);
+void ajsheap_register(duk_context *ctx);
+void ajsheap_start_exec_timeout(void);
+void ajsheap_clear_exec_timeout(void);
+void *AJS_Alloc(void *udata, duk_size_t size);
+void *AJS_Realloc(void *udata, void *ptr, duk_size_t size);
+void AJS_Free(void *udata, void *ptr);
+#endif
+
+#ifdef DUK_CMDLINE_DEBUGGER_SUPPORT
+#include "duk_debug_trans_socket.h"
+#endif
 
 #define  MEM_LIMIT_NORMAL   (128*1024*1024)   /* 128 MB */
 #define  MEM_LIMIT_HIGH     (2047*1024*1024)  /* ~2 GB */
 #define  LINEBUF_SIZE       65536
 
-/* FIXME: additional modules should probably only be in some separate tool? */
-#if 0
-extern void duk_ncurses_register(duk_context *ctx);
-extern void duk_socket_register(duk_context *ctx);
-extern void duk_fileio_register(duk_context *ctx);
-#endif
-
-int interactive_mode = 0;
+static int interactive_mode = 0;
 
 #ifndef NO_RLIMIT
 static void set_resource_limits(rlim_t mem_limit_value) {
@@ -104,10 +113,10 @@ static int get_stack_raw(duk_context *ctx) {
 	if (!duk_has_prop_string(ctx, -1, "stack")) {
 		return 1;
 	}
-
-	/* XXX: should check here that object is an Error instance too,
-	 * i.e. 'stack' is special.
-	 */
+	if (!duk_is_error(ctx, -1)) {
+		/* Not an Error instance, don't read "stack". */
+		return 1;
+	}
 
 	duk_get_prop_string(ctx, -1, "stack");  /* caller coerces */
 	duk_remove(ctx, -2);
@@ -115,7 +124,7 @@ static int get_stack_raw(duk_context *ctx) {
 }
 
 /* Print error to stderr and pop error. */
-static void print_error(duk_context *ctx, FILE *f) {
+static void print_pop_error(duk_context *ctx, FILE *f) {
 	/* Print error objects with a stack trace specially.
 	 * Note that getting the stack trace may throw an error
 	 * so this also needs to be safe call wrapped.
@@ -126,52 +135,60 @@ static void print_error(duk_context *ctx, FILE *f) {
 	duk_pop(ctx);
 }
 
-int wrapped_compile_execute(duk_context *ctx) {
+static int wrapped_compile_execute(duk_context *ctx) {
+	const char *src_data;
+	duk_size_t src_len;
 	int comp_flags;
 
+	/* XXX: Here it'd be nice to get some stats for the compilation result
+	 * when a suitable command line is given (e.g. code size, constant
+	 * count, function count.  These are available internally but not through
+	 * the public API.
+	 */
+
+	/* Use duk_compile_lstring_filename() variant which avoids interning
+	 * the source code.  This only really matters for low memory environments.
+	 */
+
+	/* [ ... src_data src_len filename ] */
+
 	comp_flags = 0;
-	duk_compile(ctx, comp_flags);
+	src_data = (const char *) duk_require_pointer(ctx, -3);
+	src_len = (duk_size_t) duk_require_uint(ctx, -2);
+	duk_compile_lstring_filename(ctx, comp_flags, src_data, src_len);
 
-#if 0
-	/* FIXME: something similar with public API */
-	if (interactive_mode) {
-		duk_hcompiledfunction *f = (duk_hcompiledfunction *) duk_get_hobject(ctx, -1);
+	/* [ ... src_data src_len function ] */
 
-		if (f && DUK_HOBJECT_IS_COMPILEDFUNCTION((duk_hobject *) f)) {
-			fprintf(stdout, "[bytecode length %d opcodes, registers %d, constants %d, inner functions %d]\n",
-				(int) DUK_HCOMPILEDFUNCTION_GET_CODE_COUNT(f),
-				(int) f->nregs,
-				(int) DUK_HCOMPILEDFUNCTION_GET_CONSTS_COUNT(f),
-				(int) DUK_HCOMPILEDFUNCTION_GET_FUNCS_COUNT(f));
-			fflush(stdout);
-		} else {
-			fprintf(stdout, "[invalid compile result]\n");
-			fflush(stdout);
-		}
-	}
+#if defined(DUK_CMDLINE_AJSHEAP)
+	ajsheap_start_exec_timeout();
 #endif
 
 	duk_push_global_object(ctx);  /* 'this' binding */
 	duk_call_method(ctx, 0);
 
+#if defined(DUK_CMDLINE_AJSHEAP)
+	ajsheap_clear_exec_timeout();
+#endif
+
 	if (interactive_mode) {
 		/*
-		 *  In interactive mode, write to stdout so output won't interleave as easily.
+		 *  In interactive mode, write to stdout so output won't
+		 *  interleave as easily.
 		 *
-		 *  NOTE: the ToString() coercion may fail in some cases; for instance,
-		 *  if you evaluate:
+		 *  NOTE: the ToString() coercion may fail in some cases;
+		 *  for instance, if you evaluate:
 		 *
-		 *    ( {valueOf: function() {return {}}, toString: function() {return {}}});
+		 *    ( {valueOf: function() {return {}},
+		 *       toString: function() {return {}}});
 		 *
 		 *  The error is:
 		 *
 		 *    TypeError: failed to coerce with [[DefaultValue]]
 		 *            duk_api.c:1420
 		 *
-		 *  These errors are caught and printed out as errors although
-		 *  the errors are not generated by user code as such.  Changing
-		 *  duk_to_string() to duk_safe_to_string() would avoid these
-		 *  errors.
+		 *  These are handled now by the caller which also has stack
+		 *  trace printing support.  User code can print out errors
+		 *  safely using duk_safe_to_string().
 		 */
 
 		fprintf(stdout, "= %s\n", duk_to_string(ctx, -1));
@@ -187,7 +204,7 @@ int wrapped_compile_execute(duk_context *ctx) {
 	return 0;
 }
 
-int handle_fh(duk_context *ctx, FILE *f, const char *filename) {
+static int handle_fh(duk_context *ctx, FILE *f, const char *filename) {
 	char *buf = NULL;
 	int len;
 	int got;
@@ -208,17 +225,23 @@ int handle_fh(duk_context *ctx, FILE *f, const char *filename) {
 
 	got = fread((void *) buf, (size_t) 1, (size_t) len, f);
 
-	duk_push_lstring(ctx, buf, got);
+	duk_push_pointer(ctx, (void *) buf);
+	duk_push_uint(ctx, (duk_uint_t) got);
 	duk_push_string(ctx, filename);
+
+	interactive_mode = 0;  /* global */
+
+	rc = duk_safe_call(ctx, wrapped_compile_execute, 3 /*nargs*/, 1 /*nret*/);
+
+#if defined(DUK_CMDLINE_AJSHEAP)
+	ajsheap_clear_exec_timeout();
+#endif
 
 	free(buf);
 	buf = NULL;
 
-	interactive_mode = 0;  /* global */
-
-	rc = duk_safe_call(ctx, wrapped_compile_execute, 2 /*nargs*/, 1 /*nret*/);
 	if (rc != DUK_EXEC_SUCCESS) {
-		print_error(ctx, stderr);
+		print_pop_error(ctx, stderr);
 		goto error;
 	} else {
 		duk_pop(ctx);
@@ -238,7 +261,7 @@ int handle_fh(duk_context *ctx, FILE *f, const char *filename) {
 	goto cleanup;
 }
 
-int handle_file(duk_context *ctx, const char *filename) {
+static int handle_file(duk_context *ctx, const char *filename) {
 	FILE *f = NULL;
 	int retval;
 
@@ -258,8 +281,34 @@ int handle_file(duk_context *ctx, const char *filename) {
 	return -1;
 }
 
+static int handle_eval(duk_context *ctx, const char *code) {
+	int rc;
+	int retval = -1;
+
+	duk_push_pointer(ctx, (void *) code);
+	duk_push_uint(ctx, (duk_uint_t) strlen(code));
+	duk_push_string(ctx, "eval");
+
+	interactive_mode = 0;  /* global */
+
+	rc = duk_safe_call(ctx, wrapped_compile_execute, 3 /*nargs*/, 1 /*nret*/);
+
+#if defined(DUK_CMDLINE_AJSHEAP)
+	ajsheap_clear_exec_timeout();
+#endif
+
+	if (rc != DUK_EXEC_SUCCESS) {
+		print_pop_error(ctx, stderr);
+	} else {
+		duk_pop(ctx);
+		retval = 0;
+	}
+
+	return retval;
+}
+
 #ifdef NO_READLINE
-int handle_interactive(duk_context *ctx) {
+static int handle_interactive(duk_context *ctx) {
 	const char *prompt = "duk> ";
 	char *buffer = NULL;
 	int retval = 0;
@@ -300,15 +349,21 @@ int handle_interactive(duk_context *ctx) {
 			}
 		}
 
-		duk_push_lstring(ctx, buffer, idx);
+		duk_push_pointer(ctx, (void *) buffer);
+		duk_push_uint(ctx, (duk_uint_t) idx);
 		duk_push_string(ctx, "input");
 
 		interactive_mode = 1;  /* global */
 
-		rc = duk_safe_call(ctx, wrapped_compile_execute, 2 /*nargs*/, 1 /*nret*/);
+		rc = duk_safe_call(ctx, wrapped_compile_execute, 3 /*nargs*/, 1 /*nret*/);
+
+#if defined(DUK_CMDLINE_AJSHEAP)
+		ajsheap_clear_exec_timeout();
+#endif
+
 		if (rc != DUK_EXEC_SUCCESS) {
 			/* in interactive mode, write to stdout */
-			print_error(ctx, stdout);
+			print_pop_error(ctx, stdout);
 			retval = -1;  /* an error 'taints' the execution */
 		} else {
 			duk_pop(ctx);
@@ -324,7 +379,7 @@ int handle_interactive(duk_context *ctx) {
 	return retval;
 }
 #else  /* NO_READLINE */
-int handle_interactive(duk_context *ctx) {
+static int handle_interactive(duk_context *ctx) {
 	const char *prompt = "duk> ";
 	char *buffer = NULL;
 	int retval = 0;
@@ -356,20 +411,26 @@ int handle_interactive(duk_context *ctx) {
 			add_history(buffer);
 		}
 
-		duk_push_lstring(ctx, buffer, strlen(buffer));
+		duk_push_pointer(ctx, (void *) buffer);
+		duk_push_uint(ctx, (duk_uint_t) strlen(buffer));
 		duk_push_string(ctx, "input");
+
+		interactive_mode = 1;  /* global */
+
+		rc = duk_safe_call(ctx, wrapped_compile_execute, 3 /*nargs*/, 1 /*nret*/);
+
+#if defined(DUK_CMDLINE_AJSHEAP)
+		ajsheap_clear_exec_timeout();
+#endif
 
 		if (buffer) {
 			free(buffer);
 			buffer = NULL;
 		}
 
-		interactive_mode = 1;  /* global */
-
-		rc = duk_safe_call(ctx, wrapped_compile_execute, 2 /*nargs*/, 1 /*nret*/);
 		if (rc != DUK_EXEC_SUCCESS) {
 			/* in interactive mode, write to stdout */
-			print_error(ctx, stdout);
+			print_pop_error(ctx, stdout);
 			retval = -1;  /* an error 'taints' the execution */
 		} else {
 			duk_pop(ctx);
@@ -385,13 +446,33 @@ int handle_interactive(duk_context *ctx) {
 }
 #endif  /* NO_READLINE */
 
+#ifdef DUK_CMDLINE_DEBUGGER_SUPPORT
+static void debugger_detached(void *udata) {
+	fprintf(stderr, "Debugger detached, udata: %p\n", (void *) udata);
+	fflush(stderr);
+}
+#endif
+
+#define  ALLOC_DEFAULT  0
+#define  ALLOC_LOGGING  1
+#define  ALLOC_TORTURE  2
+#define  ALLOC_HYBRID   3
+#define  ALLOC_AJSHEAP  4
+
 int main(int argc, char *argv[]) {
 	duk_context *ctx = NULL;
 	int retval = 0;
 	int have_files = 0;
+	int have_eval = 0;
 	int interactive = 0;
 	int memlimit_high = 1;
+	int alloc_provider = ALLOC_DEFAULT;
+	int debugger = 0;
 	int i;
+
+#ifdef DUK_CMDLINE_AJSHEAP
+	alloc_provider = ALLOC_AJSHEAP;
+#endif
 
 	/*
 	 *  Signal handling setup
@@ -413,17 +494,35 @@ int main(int argc, char *argv[]) {
 		if (!arg) {
 			goto usage;
 		}
-		if (strcmp(arg, "-r") == 0) {
+		if (strcmp(arg, "--restrict-memory") == 0) {
 			memlimit_high = 0;
 		} else if (strcmp(arg, "-i") == 0) {
 			interactive = 1;
+		} else if (strcmp(arg, "-e") == 0) {
+			have_eval = 1;
+			if (i == argc - 1) {
+				goto usage;
+			}
+			i++;  /* skip code */
+		} else if (strcmp(arg, "--alloc-default") == 0) {
+			alloc_provider = ALLOC_DEFAULT;
+		} else if (strcmp(arg, "--alloc-logging") == 0) {
+			alloc_provider = ALLOC_LOGGING;
+		} else if (strcmp(arg, "--alloc-torture") == 0) {
+			alloc_provider = ALLOC_TORTURE;
+		} else if (strcmp(arg, "--alloc-hybrid") == 0) {
+			alloc_provider = ALLOC_HYBRID;
+		} else if (strcmp(arg, "--alloc-ajsheap") == 0) {
+			alloc_provider = ALLOC_AJSHEAP;
+		} else if (strcmp(arg, "--debugger") == 0) {
+			debugger = 1;
 		} else if (strlen(arg) >= 1 && arg[0] == '-') {
 			goto usage;
 		} else {
 			have_files = 1;
 		}
 	}
-	if (!have_files) {
+	if (!have_files && !have_eval) {
 		interactive = 1;
 	}
 
@@ -434,23 +533,137 @@ int main(int argc, char *argv[]) {
 #ifndef NO_RLIMIT
 	set_resource_limits(memlimit_high ? MEM_LIMIT_HIGH : MEM_LIMIT_NORMAL);
 #else
-	(void) memlimit_high;  /* suppress warning */
+	if (memlimit_high == 0) {
+		fprintf(stderr, "Warning: option --restrict-memory ignored, no rlimit support\n");
+		fflush(stderr);
+	}
 #endif
 
 	/*
-	 *  Create context and execute any argument file(s)
+	 *  Create context
 	 */
 
-	ctx = duk_create_heap_default();
-#if 0
-	duk_ncurses_register(ctx);
-	duk_socket_register(ctx);
-	duk_fileio_register(ctx);
+	ctx = NULL;
+	if (!ctx && alloc_provider == ALLOC_LOGGING) {
+#ifdef DUK_CMDLINE_ALLOC_LOGGING
+		ctx = duk_create_heap(duk_alloc_logging,
+		                      duk_realloc_logging,
+		                      duk_free_logging,
+		                      (void *) 0xdeadbeef,
+		                      NULL);
+#else
+		fprintf(stderr, "Warning: option --alloc-logging ignored, no logging allocator support\n");
+		fflush(stderr);
 #endif
+	}
+	if (!ctx && alloc_provider == ALLOC_TORTURE) {
+#ifdef DUK_CMDLINE_ALLOC_TORTURE
+		ctx = duk_create_heap(duk_alloc_torture,
+		                      duk_realloc_torture,
+		                      duk_free_torture,
+		                      (void *) 0xdeadbeef,
+		                      NULL);
+#else
+		fprintf(stderr, "Warning: option --alloc-torture ignored, no torture allocator support\n");
+		fflush(stderr);
+#endif
+	}
+	if (!ctx && alloc_provider == ALLOC_HYBRID) {
+#ifdef DUK_CMDLINE_ALLOC_HYBRID
+		void *udata = duk_alloc_hybrid_init();
+		if (!udata) {
+			fprintf(stderr, "Failed to init hybrid allocator\n");
+			fflush(stderr);
+		} else {
+			ctx = duk_create_heap(duk_alloc_hybrid,
+			                      duk_realloc_hybrid,
+			                      duk_free_hybrid,
+			                      udata,
+			                      NULL);
+		}
+#else
+		fprintf(stderr, "Warning: option --alloc-hybrid ignored, no hybrid allocator support\n");
+		fflush(stderr);
+#endif
+	}
+	if (!ctx && alloc_provider == ALLOC_AJSHEAP) {
+#ifdef DUK_CMDLINE_AJSHEAP
+		ajsheap_init();
+
+		ctx = duk_create_heap(AJS_Alloc,
+		                      AJS_Realloc,
+		                      AJS_Free,
+		                      (void *) 0xdeadbeef,  /* heap_udata: ignored by AjsHeap, use as marker */
+		                      NULL);                /* fatal_handler */
+#else
+		fprintf(stderr, "Warning: option --alloc-ajsheap ignored, no ajsheap allocator support\n");
+		fflush(stderr);
+#endif
+	}
+	if (!ctx && alloc_provider == ALLOC_DEFAULT) {
+		ctx = duk_create_heap_default();
+	}
+
+	if (!ctx) {
+		fprintf(stderr, "Failed to create Duktape heap\n");
+		fflush(stderr);
+		exit(-1);
+	}
+
+#ifdef DUK_CMDLINE_AJSHEAP
+	if (alloc_provider == ALLOC_AJSHEAP) {
+		fprintf(stdout, "Pool dump after heap creation\n");
+		ajsheap_dump();
+	}
+#endif
+
+#ifdef DUK_CMDLINE_AJSHEAP
+	if (alloc_provider == ALLOC_AJSHEAP) {
+		ajsheap_register(ctx);
+	}
+#endif
+
+	if (debugger) {
+#ifdef DUK_CMDLINE_DEBUGGER_SUPPORT
+		fprintf(stderr, "Debugger enabled, create socket and wait for connection\n");
+		fflush(stderr);
+		duk_debug_trans_socket_init();
+		duk_debug_trans_socket_waitconn();
+		fprintf(stderr, "Debugger connected, call duk_debugger_attach() and then execute requested file(s)/eval\n");
+		fflush(stderr);
+		duk_debugger_attach(ctx,
+		                    duk_debug_trans_socket_read,
+		                    duk_debug_trans_socket_write,
+		                    duk_debug_trans_socket_peek,
+		                    duk_debug_trans_socket_read_flush,
+		                    duk_debug_trans_socket_write_flush,
+		                    debugger_detached,
+		                    (void *) 0xbeef1234);
+#else
+		fprintf(stderr, "Warning: option --debugger ignored, no debugger support\n");
+		fflush(stderr);
+#endif
+	}
+
+	/*
+	 *  Execute any argument file(s)
+	 */
 
 	for (i = 1; i < argc; i++) {
 		char *arg = argv[i];
 		if (!arg) {
+			continue;
+		} else if (strlen(arg) == 2 && strcmp(arg, "-e") == 0) {
+			/* Here we know the eval arg exists but check anyway */
+			if (i == argc - 1) {
+				retval = 1;
+				goto cleanup;
+			}
+			if (handle_eval(ctx, argv[i + 1]) != 0) {
+				retval = 1;
+				goto cleanup;
+			}
+			i++;  /* skip code */
 			continue;
 		} else if (strlen(arg) >= 1 && arg[0] == '-') {
 			continue;
@@ -483,9 +696,28 @@ int main(int argc, char *argv[]) {
 		fflush(stderr);
 	}
 
+#ifdef DUK_CMDLINE_AJSHEAP
+	if (alloc_provider == ALLOC_AJSHEAP) {
+		fprintf(stdout, "Pool dump before duk_destroy_heap(), before forced gc\n");
+		ajsheap_dump();
+
+		duk_gc(ctx, 0);
+
+		fprintf(stdout, "Pool dump before duk_destroy_heap(), after forced gc\n");
+		ajsheap_dump();
+	}
+#endif
+
 	if (ctx) {
 		duk_destroy_heap(ctx);
 	}
+
+#ifdef DUK_CMDLINE_AJSHEAP
+	if (alloc_provider == ALLOC_AJSHEAP) {
+		fprintf(stdout, "Pool dump after duk_destroy_heap() (should have zero allocs)\n");
+		ajsheap_dump();
+	}
+#endif
 
 	return retval;
 
@@ -494,14 +726,26 @@ int main(int argc, char *argv[]) {
 	 */
 
  usage:
-	fprintf(stderr, "Usage: duk [-i] [-r] [<filenames>]\n"
+	fprintf(stderr, "Usage: duk [options] [<filenames>]\n"
 	                "\n"
-	                "   -i      enter interactive mode after executing argument file(s)\n"
-	                "   -r      use lower memory limit (used by test runner)"
-#ifdef NO_RLIMIT
-	                " (disabled)\n"
-#else
-	                "\n"
+	                "   -i                 enter interactive mode after executing argument file(s) / eval code\n"
+	                "   -e CODE            evaluate code\n"
+	                "   --restrict-memory  use lower memory limit (used by test runner)\n"
+	                "   --alloc-default    use Duktape default allocator\n"
+#ifdef DUK_CMDLINE_ALLOC_LOGGING
+	                "   --alloc-logging    use logging allocator (writes to /tmp)\n"
+#endif
+#ifdef DUK_CMDLINE_ALLOC_TORTURE
+	                "   --alloc-torture    use torture allocator\n"
+#endif
+#ifdef DUK_CMDLINE_ALLOC_HYBRID
+	                "   --alloc-hybrid     use hybrid allocator\n"
+#endif
+#ifdef DUK_CMDLINE_AJSHEAP
+	                "   --alloc-ajsheap    use ajsheap allocator (enabled by default with 'ajduk')\n"
+#endif
+#ifdef DUK_CMDLINE_DEBUGGER_SUPPORT
+			"   --debugger         start example debugger\n"
 #endif
 	                "\n"
 	                "If <filename> is omitted, interactive mode is started automatically.\n");

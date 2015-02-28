@@ -9,7 +9,7 @@
  *  XUTF-8 and CESU-8 encoding/decoding
  */
 
-duk_small_int_t duk_unicode_get_xutf8_length(duk_ucodepoint_t cp) {
+DUK_INTERNAL duk_small_int_t duk_unicode_get_xutf8_length(duk_ucodepoint_t cp) {
 	duk_uint_fast32_t x = (duk_uint_fast32_t) cp;
 	if (x < 0x80UL) {
 		/* 7 bits */
@@ -35,7 +35,7 @@ duk_small_int_t duk_unicode_get_xutf8_length(duk_ucodepoint_t cp) {
 	}
 }
 
-duk_uint8_t duk_unicode_xutf8_markers[7] = {
+DUK_INTERNAL duk_uint8_t duk_unicode_xutf8_markers[7] = {
 	0x00, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe
 };
 
@@ -43,7 +43,7 @@ duk_uint8_t duk_unicode_xutf8_markers[7] = {
  * DUK_UNICODE_MAX_XUTF8_LENGTH bytes.  Allows encoding of any
  * 32-bit (unsigned) codepoint.
  */
-duk_small_int_t duk_unicode_encode_xutf8(duk_ucodepoint_t cp, duk_uint8_t *out) {
+DUK_INTERNAL duk_small_int_t duk_unicode_encode_xutf8(duk_ucodepoint_t cp, duk_uint8_t *out) {
 	duk_uint_fast32_t x = (duk_uint_fast32_t) cp;
 	duk_small_int_t len;
 	duk_uint8_t marker;
@@ -77,7 +77,7 @@ duk_small_int_t duk_unicode_encode_xutf8(duk_ucodepoint_t cp, duk_uint8_t *out) 
  * DUK_UNICODE_MAX_CESU8_LENGTH bytes; codepoints above U+10FFFF
  * will encode to garbage but won't overwrite the output buffer.
  */
-duk_small_int_t duk_unicode_encode_cesu8(duk_ucodepoint_t cp, duk_uint8_t *out) {
+DUK_INTERNAL duk_small_int_t duk_unicode_encode_cesu8(duk_ucodepoint_t cp, duk_uint8_t *out) {
 	duk_uint_fast32_t x = (duk_uint_fast32_t) cp;
 	duk_small_int_t len;
 
@@ -103,7 +103,7 @@ duk_small_int_t duk_unicode_encode_cesu8(duk_ucodepoint_t cp, duk_uint8_t *out) 
 		 *  See: http://en.wikipedia.org/wiki/Surrogate_pair
 		 *
 		 *  20-bit codepoint, 10 bits (A and B) per surrogate pair:
-		 * 
+		 *
 		 *    x = 0b00000000 0000AAAA AAAAAABB BBBBBBBB
 		 *  sp1 = 0b110110AA AAAAAAAA  (0xd800 + ((x >> 10) & 0x3ff))
 		 *  sp2 = 0b110111BB BBBBBBBB  (0xdc00 + (x & 0x3ff))
@@ -137,8 +137,8 @@ duk_small_int_t duk_unicode_encode_cesu8(duk_ucodepoint_t cp, duk_uint8_t *out) 
 }
 
 /* Decode helper.  Return zero on error. */
-duk_small_int_t duk_unicode_decode_xutf8(duk_hthread *thr, duk_uint8_t **ptr, duk_uint8_t *ptr_start, duk_uint8_t *ptr_end, duk_ucodepoint_t *out_cp) {
-	duk_uint8_t *p;
+DUK_INTERNAL duk_small_int_t duk_unicode_decode_xutf8(duk_hthread *thr, const duk_uint8_t **ptr, const duk_uint8_t *ptr_start, const duk_uint8_t *ptr_end, duk_ucodepoint_t *out_cp) {
+	const duk_uint8_t *p;
 	duk_uint32_t res;
 	duk_uint_fast8_t ch;
 	duk_small_int_t n;
@@ -221,7 +221,7 @@ duk_small_int_t duk_unicode_decode_xutf8(duk_hthread *thr, duk_uint8_t **ptr, du
 }
 
 /* used by e.g. duk_regexp_executor.c, string built-ins */
-duk_ucodepoint_t duk_unicode_decode_xutf8_checked(duk_hthread *thr, duk_uint8_t **ptr, duk_uint8_t *ptr_start, duk_uint8_t *ptr_end) {
+DUK_INTERNAL duk_ucodepoint_t duk_unicode_decode_xutf8_checked(duk_hthread *thr, const duk_uint8_t **ptr, const duk_uint8_t *ptr_start, const duk_uint8_t *ptr_end) {
 	duk_ucodepoint_t cp;
 
 	if (duk_unicode_decode_xutf8(thr, ptr, ptr_start, ptr_end, &cp)) {
@@ -235,9 +235,9 @@ duk_ucodepoint_t duk_unicode_decode_xutf8_checked(duk_hthread *thr, duk_uint8_t 
 /* (extended) utf-8 length without codepoint encoding validation, used
  * for string interning (should probably be inlined).
  */
-duk_size_t duk_unicode_unvalidated_utf8_length(duk_uint8_t *data, duk_size_t blen) {
-	duk_uint8_t *p = data;
-	duk_uint8_t *p_end = data + blen;
+DUK_INTERNAL duk_size_t duk_unicode_unvalidated_utf8_length(const duk_uint8_t *data, duk_size_t blen) {
+	const duk_uint8_t *p = data;
+	const duk_uint8_t *p_end = data + blen;
 	duk_size_t clen = 0;
 
 	while (p < p_end) {
@@ -261,7 +261,7 @@ duk_size_t duk_unicode_unvalidated_utf8_length(duk_uint8_t *data, duk_size_t ble
  */
 
 /* Must match src/extract_chars.py, generate_match_table3(). */
-static duk_uint32_t duk__uni_decode_value(duk_bitdecoder_ctx *bd_ctx) {
+DUK_LOCAL duk_uint32_t duk__uni_decode_value(duk_bitdecoder_ctx *bd_ctx) {
 	duk_uint32_t t;
 
 	t = (duk_uint32_t) duk_bd_decode(bd_ctx, 4);
@@ -281,7 +281,7 @@ static duk_uint32_t duk__uni_decode_value(duk_bitdecoder_ctx *bd_ctx) {
 	}
 }
 
-static duk_small_int_t duk__uni_range_match(const duk_uint8_t *unitab, duk_size_t unilen, duk_codepoint_t cp) {
+DUK_LOCAL duk_small_int_t duk__uni_range_match(const duk_uint8_t *unitab, duk_size_t unilen, duk_codepoint_t cp) {
 	duk_bitdecoder_ctx bd_ctx;
 	duk_codepoint_t prev_re;
 
@@ -318,7 +318,7 @@ static duk_small_int_t duk__uni_range_match(const duk_uint8_t *unitab, duk_size_
  *  "WhiteSpace" production check.
  */
 
-duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
+DUK_INTERNAL duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
 	/*
 	 *  E5 Section 7.2 specifies six characters specifically as
 	 *  white space:
@@ -333,7 +333,7 @@ duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
 	 *  It also specifies any Unicode category 'Zs' characters as white
 	 *  space.  These can be extracted with the "src/extract_chars.py" script.
 	 *  Current result:
-	 *  
+	 *
 	 *    RAW OUTPUT:
 	 *    ===========
 	 *    0020;SPACE;Zs;0;WS;;;;;N;;;;;
@@ -354,7 +354,7 @@ duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
 	 *    202F;NARROW NO-BREAK SPACE;Zs;0;CS;<noBreak> 0020;;;;N;;;;;
 	 *    205F;MEDIUM MATHEMATICAL SPACE;Zs;0;WS;<compat> 0020;;;;N;;;;;
 	 *    3000;IDEOGRAPHIC SPACE;Zs;0;WS;<wide> 0020;;;;N;;;;;
-	 *  
+	 *
 	 *    RANGES:
 	 *    =======
 	 *    0x0020
@@ -398,7 +398,7 @@ duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
  *  "LineTerminator" production check.
  */
 
-duk_small_int_t duk_unicode_is_line_terminator(duk_codepoint_t cp) {
+DUK_INTERNAL duk_small_int_t duk_unicode_is_line_terminator(duk_codepoint_t cp) {
 	/*
 	 *  E5 Section 7.3
 	 *
@@ -418,7 +418,7 @@ duk_small_int_t duk_unicode_is_line_terminator(duk_codepoint_t cp) {
  *  "IdentifierStart" production check.
  */
 
-duk_small_int_t duk_unicode_is_identifier_start(duk_codepoint_t cp) {
+DUK_INTERNAL duk_small_int_t duk_unicode_is_identifier_start(duk_codepoint_t cp) {
 	/*
 	 *  E5 Section 7.6:
 	 *
@@ -447,10 +447,10 @@ duk_small_int_t duk_unicode_is_identifier_start(duk_codepoint_t cp) {
 	 *  The ASCII portion (codepoints 0x00 ... 0x7f) is fast-pathed below because
 	 *  it matters the most.  The ASCII related ranges of IdentifierStart are:
 	 *
-	 *    0x0041 ... 0x005a		['A' ... 'Z']
-	 *    0x0061 ... 0x007a		['a' ... 'z']
-	 *    0x0024			['$']
-	 *    0x005f			['_']
+	 *    0x0041 ... 0x005a     ['A' ... 'Z']
+	 *    0x0061 ... 0x007a     ['a' ... 'z']
+	 *    0x0024                ['$']
+	 *    0x005f                ['_']
 	 */
 
 	/* ASCII (and EOF) fast path -- quick accept and reject */
@@ -493,7 +493,7 @@ duk_small_int_t duk_unicode_is_identifier_start(duk_codepoint_t cp) {
  *  "IdentifierPart" production check.
  */
 
-duk_small_int_t duk_unicode_is_identifier_part(duk_codepoint_t cp) {
+DUK_INTERNAL duk_small_int_t duk_unicode_is_identifier_part(duk_codepoint_t cp) {
 	/*
 	 *  E5 Section 7.6:
 	 *
@@ -502,8 +502,8 @@ duk_small_int_t duk_unicode_is_identifier_part(duk_codepoint_t cp) {
 	 *      UnicodeCombiningMark
 	 *      UnicodeDigit
 	 *      UnicodeConnectorPunctuation
-	 *      <ZWNJ>	[U+200C]
-	 *      <ZWJ>	[U+200D]
+	 *      <ZWNJ>  [U+200C]
+	 *      <ZWJ>   [U+200D]
 	 *
 	 *  IdentifierPart production has one multi-character production
 	 *  as part of its IdentifierStart alternative.  The '\' character
@@ -519,12 +519,12 @@ duk_small_int_t duk_unicode_is_identifier_part(duk_codepoint_t cp) {
 	 *
 	 *  The ASCII fast path consists of:
 	 *
-	 *    0x0030 ... 0x0039		['0' ... '9', UnicodeDigit]
-	 *    0x0041 ... 0x005a		['A' ... 'Z', IdentifierStart]
-	 *    0x0061 ... 0x007a		['a' ... 'z', IdentifierStart]
-	 *    0x0024			['$', IdentifierStart]
-	 *    0x005f			['_', IdentifierStart and
-	 *                               UnicodeConnectorPunctuation]
+	 *    0x0030 ... 0x0039     ['0' ... '9', UnicodeDigit]
+	 *    0x0041 ... 0x005a     ['A' ... 'Z', IdentifierStart]
+	 *    0x0061 ... 0x007a     ['a' ... 'z', IdentifierStart]
+	 *    0x0024                ['$', IdentifierStart]
+	 *    0x005f                ['_', IdentifierStart and
+	 *                                UnicodeConnectorPunctuation]
 	 *
 	 *  UnicodeCombiningMark has no code points <= 0x7f.
 	 *
@@ -585,7 +585,7 @@ duk_small_int_t duk_unicode_is_identifier_part(duk_codepoint_t cp) {
  *  Unicode letter check.
  */
 
-duk_small_int_t duk_unicode_is_letter(duk_codepoint_t cp) {
+DUK_INTERNAL duk_small_int_t duk_unicode_is_letter(duk_codepoint_t cp) {
 	/*
 	 *  Unicode letter is now taken to be the categories:
 	 *
@@ -595,8 +595,8 @@ duk_small_int_t duk_unicode_is_letter(duk_codepoint_t cp) {
 	 *
 	 *  The ASCII fast path consists of:
 	 *
-	 *    0x0041 ... 0x005a		['A' ... 'Z']
-	 *    0x0061 ... 0x007a		['a' ... 'z']
+	 *    0x0041 ... 0x005a     ['A' ... 'Z']
+	 *    0x0061 ... 0x007a     ['a' ... 'z']
 	 */
 
 	/* ASCII (and EOF) fast path -- quick accept and reject */
@@ -646,7 +646,7 @@ duk_small_int_t duk_unicode_is_letter(duk_codepoint_t cp) {
  *  is very slow because it runs through the conversion data in a linear
  *  fashion to save space (which is why ASCII characters have a special
  *  fast path before arriving here).
- * 
+ *
  *  The particular bit counts etc have been determined experimentally to
  *  be small but still sufficient, and must match the Python script
  *  (src/extract_caseconv.py).
@@ -660,10 +660,11 @@ duk_small_int_t duk_unicode_is_letter(duk_codepoint_t cp) {
  *  this function.
  */
 
-static duk_codepoint_t duk__slow_case_conversion(duk_hthread *thr,
-                                                 duk_hbuffer_dynamic *buf,
-                                                 duk_codepoint_t cp,
-                                                 duk_bitdecoder_ctx *bd_ctx) {
+DUK_LOCAL
+duk_codepoint_t duk__slow_case_conversion(duk_hthread *thr,
+                                          duk_hbuffer_dynamic *buf,
+                                          duk_codepoint_t cp,
+                                          duk_bitdecoder_ctx *bd_ctx) {
 	duk_small_int_t skip = 0;
 	duk_small_int_t n;
 	duk_small_int_t t;
@@ -731,7 +732,7 @@ static duk_codepoint_t duk__slow_case_conversion(duk_hthread *thr,
 				while (t--) {
 					tmp_cp = (duk_codepoint_t) duk_bd_decode(bd_ctx, 16);
 					DUK_ASSERT(buf != NULL);
-					duk_hbuffer_append_xutf8(thr, buf, (duk_uint32_t) tmp_cp);  /* FIXME: duk_codepoint_t */
+					duk_hbuffer_append_xutf8(thr, buf, (duk_ucodepoint_t) tmp_cp);
 				}
 			}
 			return -1;
@@ -763,12 +764,13 @@ static duk_codepoint_t duk__slow_case_conversion(duk_hthread *thr,
 /* XXX: add 'language' argument when locale/language sensitive rule
  * support added.
  */
-static duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
-                                                  duk_hbuffer_dynamic *buf,
-                                                  duk_codepoint_t cp,
-                                                  duk_codepoint_t prev,
-                                                  duk_codepoint_t next,
-                                                  duk_bool_t uppercase) {
+DUK_LOCAL
+duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
+                                           duk_hbuffer_dynamic *buf,
+                                           duk_codepoint_t cp,
+                                           duk_codepoint_t prev,
+                                           duk_codepoint_t next,
+                                           duk_bool_t uppercase) {
 	duk_bitdecoder_ctx bd_ctx;
 
 	/* fast path for ASCII */
@@ -795,11 +797,12 @@ static duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
 	 * in the caseconv bitstream: hardcoded rules in C
 	 */
 	if (uppercase) {
-		/* XXX: turkish / azeri not implemented */
+		/* XXX: turkish / azeri */
 	} else {
 		/*
-		 *  Final sigma context specific rule.  This is a rather tricky rule
-		 *  and this handling is probably not 100% correct now.
+		 *  Final sigma context specific rule.  This is a rather tricky
+		 *  rule and this handling is probably not 100% correct now.
+		 *  The rule is not locale/language specific so it is supported.
 		 */
 
 		if (cp == 0x03a3L &&    /* U+03A3 = GREEK CAPITAL LETTER SIGMA */
@@ -817,12 +820,6 @@ static duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
 		/* XXX: lithuanian not implemented */
 		/* XXX: lithuanian, explicit dot rules */
 		/* XXX: turkish / azeri, lowercase rules */
-#if 0
-		if (0 /* language == 'lt' */ &&
-		    cp == 0x0307L) {               /* U+0307 = COMBINING DOT ABOVE */
-			goto nochar;
-		}
-#endif
 	}
 
 	/* 1:1 or special conversions, but not locale/context specific: script generated rules */
@@ -853,11 +850,11 @@ static duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
  *  Replace valstack top with case converted version.
  */
 
-void duk_unicode_case_convert_string(duk_hthread *thr, duk_small_int_t uppercase) {
+DUK_INTERNAL void duk_unicode_case_convert_string(duk_hthread *thr, duk_small_int_t uppercase) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_hstring *h_input;
 	duk_hbuffer_dynamic *h_buf;
-	duk_uint8_t *p, *p_start, *p_end;
+	const duk_uint8_t *p, *p_start, *p_end;
 	duk_codepoint_t prev, curr, next;
 
 	h_input = duk_require_hstring(ctx, -1);
@@ -918,7 +915,7 @@ void duk_unicode_case_convert_string(duk_hthread *thr, duk_small_int_t uppercase
  *  specific rules can apply.  Locale specific rules can apply, though.
  */
 
-duk_codepoint_t duk_unicode_re_canonicalize_char(duk_hthread *thr, duk_codepoint_t cp) {
+DUK_INTERNAL duk_codepoint_t duk_unicode_re_canonicalize_char(duk_hthread *thr, duk_codepoint_t cp) {
 	duk_codepoint_t y;
 
 	y = duk__case_transform_helper(thr,
@@ -943,7 +940,7 @@ duk_codepoint_t duk_unicode_re_canonicalize_char(duk_hthread *thr, duk_codepoint
  *  x < 0 for characters read outside the string.
  */
 
-duk_small_int_t duk_unicode_re_is_wordchar(duk_codepoint_t x) {
+DUK_INTERNAL duk_small_int_t duk_unicode_re_is_wordchar(duk_codepoint_t x) {
 	/*
 	 *  Note: the description in E5 Section 15.10.2.6 has a typo, it
 	 *  contains 'A' twice and lacks 'a'; the intent is [0-9a-zA-Z_].
@@ -962,10 +959,10 @@ duk_small_int_t duk_unicode_re_is_wordchar(duk_codepoint_t x) {
  */
 
 /* exposed because lexer needs these too */
-duk_uint16_t duk_unicode_re_ranges_digit[2] = {
+DUK_INTERNAL duk_uint16_t duk_unicode_re_ranges_digit[2] = {
 	(duk_uint16_t) 0x0030UL, (duk_uint16_t) 0x0039UL,
 };
-duk_uint16_t duk_unicode_re_ranges_white[22] = {
+DUK_INTERNAL duk_uint16_t duk_unicode_re_ranges_white[22] = {
 	(duk_uint16_t) 0x0009UL, (duk_uint16_t) 0x000DUL,
 	(duk_uint16_t) 0x0020UL, (duk_uint16_t) 0x0020UL,
 	(duk_uint16_t) 0x00A0UL, (duk_uint16_t) 0x00A0UL,
@@ -978,17 +975,17 @@ duk_uint16_t duk_unicode_re_ranges_white[22] = {
 	(duk_uint16_t) 0x3000UL, (duk_uint16_t) 0x3000UL,
 	(duk_uint16_t) 0xFEFFUL, (duk_uint16_t) 0xFEFFUL,
 };
-duk_uint16_t duk_unicode_re_ranges_wordchar[8] = {
+DUK_INTERNAL duk_uint16_t duk_unicode_re_ranges_wordchar[8] = {
 	(duk_uint16_t) 0x0030UL, (duk_uint16_t) 0x0039UL,
 	(duk_uint16_t) 0x0041UL, (duk_uint16_t) 0x005AUL,
 	(duk_uint16_t) 0x005FUL, (duk_uint16_t) 0x005FUL,
 	(duk_uint16_t) 0x0061UL, (duk_uint16_t) 0x007AUL,
 };
-duk_uint16_t duk_unicode_re_ranges_not_digit[4] = {
+DUK_INTERNAL duk_uint16_t duk_unicode_re_ranges_not_digit[4] = {
 	(duk_uint16_t) 0x0000UL, (duk_uint16_t) 0x002FUL,
 	(duk_uint16_t) 0x003AUL, (duk_uint16_t) 0xFFFFUL,
 };
-duk_uint16_t duk_unicode_re_ranges_not_white[24] = {
+DUK_INTERNAL duk_uint16_t duk_unicode_re_ranges_not_white[24] = {
 	(duk_uint16_t) 0x0000UL, (duk_uint16_t) 0x0008UL,
 	(duk_uint16_t) 0x000EUL, (duk_uint16_t) 0x001FUL,
 	(duk_uint16_t) 0x0021UL, (duk_uint16_t) 0x009FUL,
@@ -1002,7 +999,7 @@ duk_uint16_t duk_unicode_re_ranges_not_white[24] = {
 	(duk_uint16_t) 0x3001UL, (duk_uint16_t) 0xFEFEUL,
 	(duk_uint16_t) 0xFF00UL, (duk_uint16_t) 0xFFFFUL,
 };
-duk_uint16_t duk_unicode_re_ranges_not_wordchar[10] = {
+DUK_INTERNAL duk_uint16_t duk_unicode_re_ranges_not_wordchar[10] = {
 	(duk_uint16_t) 0x0000UL, (duk_uint16_t) 0x002FUL,
 	(duk_uint16_t) 0x003AUL, (duk_uint16_t) 0x0040UL,
 	(duk_uint16_t) 0x005BUL, (duk_uint16_t) 0x005EUL,
@@ -1011,4 +1008,3 @@ duk_uint16_t duk_unicode_re_ranges_not_wordchar[10] = {
 };
 
 #endif  /* DUK_USE_REGEXP_SUPPORT */
-

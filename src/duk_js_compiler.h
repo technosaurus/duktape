@@ -127,7 +127,7 @@ struct duk_compiler_func {
 	                                     */
 	duk_hobject *h_labelnames;          /* array of active label names */
 	duk_hbuffer_dynamic *h_labelinfos;  /* C array of duk_labelinfo */
-	duk_hobject *h_argnames;            /* array of formal argument names (-> _formals) */
+	duk_hobject *h_argnames;            /* array of formal argument names (-> _Formals) */
 	duk_hobject *h_varmap;              /* variable map for pass 2 (identifier -> register number or null (unmapped)) */
 
 	/* value stack indices for tracking objects */
@@ -165,6 +165,10 @@ struct duk_compiler_func {
 	duk_int_t fnum_next;                /* inner function numbering */
 	duk_int_t num_formals;              /* number of formal arguments */
 	duk_reg_t reg_stmt_value;           /* register for writing value of 'non-empty' statements (global or eval code), -1 is marker */
+#if defined(DUK_USE_DEBUGGER_SUPPORT)
+	duk_int_t min_line;                 /* XXX: typing (duk_hcompiledfunction has duk_uint32_t) */
+	duk_int_t max_line;
+#endif
 
 	/* status booleans */
 	duk_bool_t is_function;             /* is an actual function (not global/eval code) */
@@ -217,6 +221,6 @@ struct duk_compiler_ctx {
 #define DUK_JS_COMPILE_FLAG_STRICT    (1 << 1)  /* strict outer context */
 #define DUK_JS_COMPILE_FLAG_FUNCEXPR  (1 << 2)  /* source is a function expression (used for Function constructor) */
 
-void duk_js_compile(duk_hthread *thr, const duk_uint8_t *src_buffer, duk_size_t src_length, duk_small_uint_t flags);
+DUK_INTERNAL_DECL void duk_js_compile(duk_hthread *thr, const duk_uint8_t *src_buffer, duk_size_t src_length, duk_small_uint_t flags);
 
 #endif  /* DUK_JS_COMPILER_H_INCLUDED */

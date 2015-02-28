@@ -1,6 +1,5 @@
 /*---
 {
-    "knownissue": "yield() not allowed when function called via Function.prototype.(call|apply)()",
     "custom": true
 }
 ---*/
@@ -46,4 +45,3 @@ try {
 } catch (e) {
     print(e.name);
 }
-
